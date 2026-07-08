@@ -141,10 +141,7 @@ function spawnParticles(x, y, color, count) {
  * 更新
  * ============================================ */
 function update() {
-  try {
-  window._debugFrames = (window._debugFrames||0)+1;
   if (gameState === 'win') { winTimer++; if (winTimer>120) return; }
-  if (gameState === 'dead') { deadTimer--; if (deadTimer<=0) respawn(); return; }
   if (gameState === 'gameover') return;
 
   /* ==========================================
@@ -304,22 +301,24 @@ function die() {
   if (gameState !== 'playing') return;
   lives--; deaths++;
   spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#f44', 30);
+  document.getElementById('lives').textContent = lives;
+
   if (lives <= 0) {
     gameState = 'gameover';
-    showMsg('💀 生命耗尽！\n按 R 重新开始', false);
+    showMsg('💀 生命耗尽！游戏重新开始...', false);
+    setTimeout(() => location.reload(), 2000);
   } else {
-    gameState = 'dead';
-    deadTimer = 90; // 1.5秒
+    // 原地复活：回到上方，2秒无敌+闪烁
+    player.y = GROUND_Y - CHAR_H - 20;
+    player.vy = 0;
+    player.vx = 0;
+    player.jumpsUsed = 0;
+    invincibleTimer = 120; // 2秒 @60fps
+    gameState = 'playing';
     document.getElementById('msg').style.opacity = '1';
-    document.getElementById('msg').innerHTML = '💀';
+    document.getElementById('msg').innerHTML = '💔 -1';
+    setTimeout(() => { document.getElementById('msg').style.opacity = '0'; }, 800);
   }
-}
-
-function respawn() {
-  player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
-  player.vx = 0; player.vy = 0;
-  player.jumpsUsed = 0;
-  gameState = 'playing';
 }
 
 function resetLevel() {
@@ -400,9 +399,11 @@ function draw() {
   }
 
   /* ---- 角色 ---- */
-  const showChar = gameState !== 'dead' || Math.floor(deadTimer/4)%2 === 0;
-  const invBlink = invincibleTimer > 0 && Math.floor(invincibleTimer/2)%2 === 0;
-  if (showChar && !invBlink) {
+  const showChar = gameState !== 'gameover';
+  if (invincibleTimer > 0) {
+    ctx.globalAlpha = 0.4 + Math.sin(invincibleTimer * 0.5) * 0.2;
+  }
+  if (showChar) {
     const p = player;
     // 阴影
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+2, p.y+CHAR_H-2, CHAR_W-4, 4);
@@ -434,6 +435,7 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x+CHAR_W/2, p.y+CHAR_H, 20, 0, Math.PI*2); ctx.fill();
     }
   }
+  ctx.globalAlpha = 1;
 
   /* ---- 粒子 ---- */
   for (const p of particles) {
