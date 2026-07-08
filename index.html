@@ -226,12 +226,12 @@ function update() {
 
   /* ---- 碰撞 ---- */
   const prevBottom = player.y + CHAR_H - player.vy;
+  const pcx = player.x + CHAR_W / 2;
+  const halfW = CHAR_W * 0.4; // 判定宽度：中心±40%，大半悬空即掉落
   player.onGround = false;
   const allSolids = [...GROUNDS, ...PLATFORMS];
-
-  // Y轴碰撞
   for (const s of allSolids) {
-    if (player.x+CHAR_W <= s.x || player.x >= s.x+s.w) continue;
+    if (pcx + halfW <= s.x || pcx - halfW >= s.x + s.w) continue;
     if (player.y+CHAR_H <= s.y || player.y >= s.y+s.h) continue;
 
     if (player.vy >= 0) { // 下落
@@ -257,7 +257,7 @@ function update() {
 
   /* ---- 尖刺 ---- */
   for (const s of SPIKES) {
-    if (player.x + CHAR_W > s.x && player.x < s.x + s.w &&
+    if (pcx + 6 > s.x && pcx - 6 < s.x + s.w &&
         player.y + CHAR_H > s.y && player.y < s.y + s.h &&
         invincibleTimer <= 0) {
       die();
