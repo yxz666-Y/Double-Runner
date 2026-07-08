@@ -141,7 +141,7 @@ function spawnParticles(x, y, color, count) {
  * 更新
  * ============================================ */
 function update() {
-  // 调试点：在角色头顶显示帧计数
+  try {
   window._debugFrames = (window._debugFrames||0)+1;
   if (gameState === 'win') { winTimer++; if (winTimer>120) return; }
   if (gameState === 'dead') { deadTimer--; if (deadTimer<=0) respawn(); return; }
@@ -287,6 +287,7 @@ function update() {
   /* ---- HUD ---- */
   document.getElementById('lives').textContent = lives;
   document.getElementById('coins').textContent = coinsCollected;
+  } catch(e) { window._lastError = e.message; }
 }
 
 function die() {
@@ -444,6 +445,7 @@ function draw() {
   ctx.fillText('x:'+player.x.toFixed(0)+' y:'+player.y.toFixed(0),10,20);
   ctx.fillText('vy:'+player.vy.toFixed(2)+' onGround:'+player.onGround,10,40);
   ctx.fillText('groundY:'+GROUND_Y+' gameState:'+gameState,10,60);
+  if(window._lastError){ctx.fillStyle='#f44';ctx.fillText('ERR:'+window._lastError,10,80)}
 }
 
 /* ============================================
