@@ -223,29 +223,32 @@ function update() {
   if (player.x < 0) player.x = 0;
   if (player.x > LEVEL_W - CHAR_W) player.x = LEVEL_W - CHAR_W;
 
-  /* ---- 碰撞 ---- */
+  /* ---- 碰撞（先Y后X，防止隧道效应） ---- */
   player.onGround = false;
   const allSolids = [...GROUNDS, ...PLATFORMS];
 
+  // Y轴碰撞
   for (const s of allSolids) {
-    if (!rectCollide(player, s)) continue;
-    const pBottom = player.y + CHAR_H, pTop = player.y;
-    const sBottom = s.y + s.h, sTop = s.y;
-    const prevBottom = pBottom - player.vy, prevTop = pTop - player.vy;
-
-    if (player.vy > 0 && prevBottom < sBottom) { // 落在上面（防止隧道效应）
+    if (player.x+CHAR_W <= s.x || player.x >= s.x+s.w) continue; // X轴未对齐
+    if (player.y+CHAR_H <= s.y || player.y >= s.y+s.h) continue; // Y轴未重叠
+    // 重叠了——判断方向
+    if (player.vy >= 0) { // 下落→站上去
       player.y = s.y - CHAR_H;
       player.vy = 0;
       player.onGround = true;
       player.jumpsUsed = 0;
-    } else if (player.vy < 0 && prevTop > sTop) { // 撞头
+    } else { // 上升→撞头
       player.y = s.y + s.h;
       player.vy = 0;
-    } else if (player.vx > 0 && player.x < s.x) { // 右侧碰撞
-      player.x = s.x - CHAR_W;
-    } else if (player.vx < 0 && player.x > s.x + s.w - CHAR_W) { // 左侧碰撞
-      player.x = s.x + s.w;
     }
+  }
+
+  // X轴碰撞（不和地面做X碰撞，只和墙壁/平台侧面）
+  for (const s of PLATFORMS) {
+    if (player.y+CHAR_H <= s.y+4 || player.y >= s.y+s.h-4) continue; // Y轴未对齐
+    if (player.x+CHAR_W <= s.x || player.x >= s.x+s.w) continue;
+    if (player.vx > 0) player.x = s.x - CHAR_W;
+    else if (player.vx < 0) player.x = s.x + s.w;
   }
 
   /* ---- 尖刺 ---- */
