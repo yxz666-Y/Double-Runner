@@ -16,7 +16,7 @@ canvas{display:block;border:1px solid #333}
 <body>
 <div id="hud">
   <span id="p1">P1: A/D 移动 | W 二段跳</span>
-  <span id="p2">P2: ↑ 跳跃 | ↓ 快速下落</span>
+  <span id="p2">P2: ↑ 跳 | ↓ 下落 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
@@ -34,6 +34,10 @@ const JUMP_V       = -10.5;  // 一段跳初速度
 const DOUBLE_JUMP_V= -9.0;   // 二段跳初速度
 const MOVE_SPEED   = 4.5;    // 水平移速（px/frame）
 const FAST_FALL    = 0.8;    // 快速下落额外加速度
+const DASH_SPEED   = 12;     // 冲刺速度
+const DASH_DURATION= 8;      // 冲刺持续帧数
+const DASH_COOLDOWN= 60;     // 冲刺冷却帧数
+const DJ_WINDOW    = 18;     // 二段跳时间窗（帧数，约300ms@60fps）
 const GROUND_Y     = 430;    // 地面 y 坐标
 const CHAR_W = 28, CHAR_H = 38; // 角色尺寸
 
@@ -53,6 +57,14 @@ let lives = 3, coinsCollected = 0, deaths = 0;
 let gameState = 'playing'; // playing | win | dead | gameover
 let deadTimer = 0, winTimer = 0;
 let particles = [];
+
+// 冲刺 & 二段跳状态
+let dashTimer = 0;           // 冲刺剩余帧数（>0=冲刺中）
+let dashCooldown = 0;        // 冲刺冷却剩余帧数
+let dashDir = 0;             // 冲刺方向：-1左 1右
+let invincibleTimer = 0;     // 无敌帧剩余
+let djWindow = 0;            // 二段跳时间窗剩余帧数（P2跳跃后开启）
+let p2JumpHeld = false;      // P2是否正在按住跳跃键（防连跳）
 
 /* ============================================
  * 关卡数据 {x,y,w,h,type}
@@ -133,33 +145,71 @@ function update() {
   if (gameState === 'dead') { deadTimer--; if (deadTimer<=0) respawn(); return; }
   if (gameState === 'gameover') return;
 
-  /* ---- P1: 水平移动 ---- */
-  player.vx = 0;
-  if (keys['KeyA']) player.vx = -MOVE_SPEED;
-  if (keys['KeyD']) player.vx = MOVE_SPEED;
+  /* ==========================================
+   * 操作处理
+   * ========================================== */
 
-  /* ---- P2: 跳跃 & 快速下落 ---- */
-  if (keys['ArrowUp'] && player.onGround) {
+  // === P1: A/D 水平移动（冲刺中不覆盖） ===
+  const p1Left = keys['KeyA'], p1Right = keys['KeyD'];
+  if (dashTimer <= 0) {
+    player.vx = 0;
+    if (p1Left)  player.vx = -MOVE_SPEED;
+    if (p1Right) player.vx = MOVE_SPEED;
+  }
+
+  /* === P2: ↑ 跳跃（仅地面） === */
+  if (keys['ArrowUp'] && player.onGround && !p2JumpHeld) {
     player.vy = JUMP_V;
     player.onGround = false;
     player.jumpsUsed = 1;
+    djWindow = DJ_WINDOW;  // 开启二段跳时间窗
+    p2JumpHeld = true;
     spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#5bf', 6);
   }
+  if (!keys['ArrowUp']) p2JumpHeld = false;
 
-  /* ---- P1: 二段跳（空中 + W 键） ---- */
-  if (keys['KeyW'] && !player.onGround && player.jumpsUsed < player.maxJumps) {
-    // 防止按住W连续触发
+  /* === 二段跳：P2起跳后时间窗内 P1按W === */
+  if (djWindow > 0) djWindow--;
+  if (keys['KeyW'] && !player.onGround && djWindow > 0 && player.jumpsUsed < player.maxJumps) {
     keys['KeyW'] = false;
     player.vy = DOUBLE_JUMP_V;
     player.jumpsUsed++;
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fff', 12);
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fd0', 8);
+    djWindow = 0;
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fff', 14);
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fd0', 10);
   }
 
-  /* ---- P2: 快速下落 ---- */
+  /* === 冲刺：P1按住A/D时 P2点按同方向箭头 === */
+  if (dashTimer > 0) {
+    dashTimer--;
+    player.vx = dashDir * DASH_SPEED;
+    invincibleTimer = 3; // 冲刺结束后保留3帧无敌
+  } else if (dashCooldown > 0) {
+    dashCooldown--;
+  } else {
+    const dashLeft  = keys['ArrowLeft']  && p1Left  && !keys._prevArrowLeft;
+    const dashRight = keys['ArrowRight'] && p1Right && !keys._prevArrowRight;
+    if (dashLeft) {
+      dashTimer = DASH_DURATION; dashDir = -1; dashCooldown = DASH_COOLDOWN;
+      invincibleTimer = DASH_DURATION + 3;
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
+    }
+    if (dashRight) {
+      dashTimer = DASH_DURATION; dashDir = 1; dashCooldown = DASH_COOLDOWN;
+      invincibleTimer = DASH_DURATION + 3;
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
+    }
+  }
+  keys._prevArrowLeft  = keys['ArrowLeft'];
+  keys._prevArrowRight = keys['ArrowRight'];
+
+  /* === P2: ↓ 快速下落 === */
   if (keys['ArrowDown'] && !player.onGround) {
     player.vy += FAST_FALL;
   }
+
+  /* === 无敌帧倒计时 === */
+  if (invincibleTimer > 0) invincibleTimer--;
 
   /* ---- 物理 ---- */
   player.vy += GRAVITY;
@@ -197,12 +247,14 @@ function update() {
   }
 
   /* ---- 尖刺 ---- */
-  for (const s of SPIKES) {
-    if (rectCollide(player, s)) die();
+  if (invincibleTimer <= 0) {
+    for (const s of SPIKES) {
+      if (rectCollide(player, s)) die();
+    }
   }
 
   /* ---- 掉出屏幕 ---- */
-  if (player.y > CANVAS_H + 80) die();
+  if (player.y > CANVAS_H + 80 && invincibleTimer <= 0) die();
 
   /* ---- 金币 ---- */
   for (let i = COINS.length-1; i >= 0; i--) {
@@ -316,15 +368,34 @@ function draw() {
   ctx.fillStyle = '#fff'; ctx.fillRect(FLAG.x+2, FLAG.y+4, FLAG.w-4, 12);
   ctx.fillStyle = '#f00'; ctx.fillRect(FLAG.x+2, FLAG.y+16, FLAG.w-4, 12);
 
+  /* ---- 冲刺残影 ---- */
+  if (dashTimer > 0) {
+    for (let i=1; i<=3; i++) {
+      const ax = player.x - dashDir * i * 12;
+      const alpha = 1 - i*0.3;
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.fillStyle = '#fff'; ctx.fillRect(ax+2, player.y+10, CHAR_W-4, CHAR_H-12);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   /* ---- 角色 ---- */
-  if (gameState !== 'dead' || Math.floor(deadTimer/4)%2 === 0) {
+  const showChar = gameState !== 'dead' || Math.floor(deadTimer/4)%2 === 0;
+  const invBlink = invincibleTimer > 0 && Math.floor(invincibleTimer/2)%2 === 0;
+  if (showChar && !invBlink) {
     const p = player;
     // 阴影
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+2, p.y+CHAR_H-2, CHAR_W-4, 4);
     // 身体
+    const bodyColor = dashTimer > 0 ? '#8cf' : '#5b9ee0';
     const bodyGrad = ctx.createLinearGradient(p.x, p.y, p.x+CHAR_W, p.y);
-    bodyGrad.addColorStop(0,'#5b9ee0'); bodyGrad.addColorStop(1,'#3b7ec0');
+    bodyGrad.addColorStop(0, bodyColor); bodyGrad.addColorStop(1, dashTimer > 0 ? '#6af' : '#3b7ec0');
     ctx.fillStyle = bodyGrad; ctx.fillRect(p.x+2, p.y+10, CHAR_W-4, CHAR_H-12);
+    // 冲刺速度线
+    if (dashTimer > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      for (let i=0; i<3; i++) ctx.fillRect(p.x+CHAR_W, p.y+14+i*8, 12, 2);
+    }
     // 头
     ctx.fillStyle = '#ffe4c8'; ctx.fillRect(p.x+4, p.y, CHAR_W-8, 14);
     // 帽子
@@ -353,9 +424,12 @@ function draw() {
 
   ctx.restore();
 
-  /* ---- HUD 跳跃状态 ---- */
+  /* ---- HUD 状态 ---- */
   ctx.fillStyle = '#fff'; ctx.font = '13px -apple-system';
-  ctx.fillText('跳跃: ' + (player.jumpsUsed) + '/' + (player.maxJumps-1), CANVAS_W-120, 24);
+  const djReady = djWindow > 0 && !player.onGround && player.jumpsUsed < player.maxJumps;
+  ctx.fillText('二段跳: ' + (djReady ? '⏳就绪' : '—'), CANVAS_W-140, 24);
+  ctx.fillText('冲刺: ' + (dashCooldown > 0 ? '冷却' + Math.ceil(dashCooldown/60) + 's' : '✅'), CANVAS_W-140, 44);
+  ctx.fillText('无敌: ' + (invincibleTimer > 0 ? Math.ceil(invincibleTimer/60) + 's' : '—'), CANVAS_W-140, 64);
 }
 
 /* ============================================
