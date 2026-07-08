@@ -301,7 +301,6 @@ function update() {
   /* ---- HUD ---- */
   document.getElementById('lives').textContent = lives;
   document.getElementById('coins').textContent = coinsCollected;
-  } catch(e) { window._lastError = e.message; }
 }
 
 let lastSafeX = 60, lastSafeY = GROUND_Y - CHAR_H - 10;
@@ -347,10 +346,6 @@ function resetLevel() {
  * 渲染
  * ============================================ */
 function draw() {
-  // 强制清屏——确保不是渲染问题
-  ctx.fillStyle = '#f00'; ctx.fillRect(0,0,100,100);
-  ctx.fillStyle = '#0f0'; ctx.fillRect(0,0,50,50);
-
   // 开始画面
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
