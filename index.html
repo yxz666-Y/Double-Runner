@@ -145,7 +145,7 @@ function update() {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
     return;
   }
-  if (gameState === 'win') { winTimer++; if (winTimer>120) return; }
+  if (gameState === 'win') { winTimer++; if (winTimer>180) location.reload(); return; }
   if (gameState === 'gameover') return;
 
   /* ==========================================
@@ -346,6 +346,18 @@ function resetLevel() {
  * 渲染
  * ============================================ */
 function draw() {
+  // 通关画面
+  if (gameState === 'win') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+    ctx.fillStyle = '#fd0'; ctx.font = 'bold 40px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎉 完美配合！', CANVAS_W/2, 200);
+    ctx.fillText('通关成功！', CANVAS_W/2, 250);
+    ctx.fillStyle = '#fff'; ctx.font = '16px -apple-system';
+    ctx.fillText('3秒后返回主菜单', CANVAS_W/2, 300);
+    ctx.textAlign = 'left';
+    return;
+  }
   // 开始画面
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
