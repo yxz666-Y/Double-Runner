@@ -135,7 +135,7 @@ document.addEventListener('keydown', e => {
     if (e.code === 'Enter' || e.code === 'Space') {
       if (currentLevel < Object.keys(LEVELS).length) { loadLevel(currentLevel+1); return; }
     }
-    if (e.code === 'Backspace') { gameState = 'menu'; return; }
+    if (e.code === 'Backspace') { gameState = 'menu'; document.getElementById('msg').style.opacity = '0'; return; }
   }
   if (e.code === 'KeyR' && (gameState === 'dead' || gameState === 'gameover')) resetLevel();
 });
@@ -171,7 +171,7 @@ function update() {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
     return;
   }
-  if (gameState === 'win') { winTimer++; if (winTimer>300) gameState='menu'; return; }
+  if (gameState === 'win') { winTimer++; if (winTimer>300) { gameState='menu'; document.getElementById('msg').style.opacity='0'; } return; }
   if (gameState === 'gameover') return;
 
   /* ==========================================
