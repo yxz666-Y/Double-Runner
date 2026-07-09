@@ -455,20 +455,24 @@ function draw() {
   // 开始菜单（含选关）
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system'; ctx.textAlign = 'center';
-    ctx.fillText('双人跑酷', CANVAS_W/2, 130);
-    ctx.font = '14px -apple-system'; ctx.fillStyle = '#aaa';
-    ctx.fillText('P1: A/D 移动 | P2: ↑ 跳跃  |  P1+2: 冲刺 & 二段跳', CANVAS_W/2, 180);
-    // 关卡选择
-    ctx.font = 'bold 18px -apple-system';
-    for (let i=1; i<=Object.keys(LEVELS).length; i++) {
-      ctx.fillStyle = i===menuSelection ? '#fd0' : '#888';
-      const hs = highScores[i] || 0;
-      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name + (hs?'  最高 '+hs:'  无记录'), CANVAS_W/2, 260+i*40);
-      ctx.font = 'bold 18px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 28px -apple-system';
+    ctx.fillText('双人跑酷', CANVAS_W/2, 40);
+    ctx.font = '11px -apple-system'; ctx.fillStyle = '#888';
+    ctx.fillText('P1: A/D+W | P2: ↑↓←→ | 冲刺 & 二段跳', CANVAS_W/2, 60);
+    // 关卡列表
+    const startY = 95, rowH = 30;
+    for (let i=1; i<=totalLevels; i++) {
+      const y = startY + (i-1)*rowH;
+      const sel = i===menuSelection;
+      if (sel) { ctx.fillStyle = 'rgba(255,200,0,0.12)'; ctx.fillRect(CANVAS_W/2-170, y-12, 340, 26); }
+      ctx.font = sel?'bold 15px -apple-system':'13px -apple-system';
+      ctx.fillStyle = sel?'#fd0':'#aaa';
+      const hs = highScores[i]||0;
+      ctx.fillText((sel?'▶ ':'  ')+'第'+i+'关 '+LEVELS[i].name+(hs?'  最高'+hs:'  无记录'), CANVAS_W/2, y);
     }
-    ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px -apple-system';
-    ctx.fillText('↑↓ 切换  ·  Enter 进入  ·  1/2 快速选关', CANVAS_W/2, 370);
+    ctx.font = '12px -apple-system'; ctx.fillStyle = '#ff0';
+    ctx.fillText('↑↓ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+15);
     ctx.textAlign = 'left'; return;
   }
 
