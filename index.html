@@ -36,6 +36,21 @@ body.settings #settings-panel{display:flex}
 #settings-panel .opt{display:block;width:100%;margin:8px 0;padding:14px 0;font-size:20px;color:#fff;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;font-family:-apple-system,sans-serif;transition:all 0.15s}
 #settings-panel .opt:hover, #settings-panel .opt.sel{background:rgba(255,200,0,0.25);border-color:#fd0;color:#fd0;transform:scale(1.03)}
 #settings-panel .hint{margin-top:14px;font-size:13px;color:#888;font-family:-apple-system,sans-serif}
+
+/* 声音设置面板 */
+#audio-panel{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:25;cursor:pointer}
+body.audiosettings #audio-panel{display:flex}
+#audio-panel .audio-box{background:rgba(20,20,30,0.97);border:2px solid #fd0;border-radius:14px;padding:24px 36px;min-width:380px;text-align:center;box-shadow:0 0 30px rgba(255,200,0,0.3)}
+#audio-panel h2{color:#fd0;font-size:24px;margin:0 0 18px 0;font-family:-apple-system,sans-serif}
+#audio-panel .aud-row{display:flex;align-items:center;gap:12px;margin:14px 0;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px}
+#audio-panel .aud-row label{color:#fff;font-size:15px;min-width:80px;text-align:left;font-family:-apple-system,sans-serif}
+#audio-panel .aud-row input[type=range]{flex:1;height:6px;-webkit-appearance:none;background:#222;border-radius:3px;outline:none}
+#audio-panel .aud-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fd0;cursor:pointer;border:2px solid #fff}
+#audio-panel .aud-row input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fd0;cursor:pointer;border:2px solid #fff}
+#audio-panel .aud-row span{color:#fd0;font-size:14px;min-width:42px;text-align:right;font-family:monospace}
+#audio-panel .audio-close{margin-top:14px;padding:10px 32px;font-size:16px;color:#000;background:#fd0;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-family:-apple-system,sans-serif}
+#audio-panel .audio-close:hover{background:#fff}
+#audio-panel .hint{margin-top:10px;font-size:12px;color:#888;font-family:-apple-system,sans-serif}
 </style>
 </head>
 <body>
@@ -59,6 +74,23 @@ body.settings #settings-panel{display:flex}
     <button class="opt" data-act="restart">🔄 重新开始</button>
     <button class="opt" data-act="menu">🏠 回到主页</button>
     <div class="hint">↑↓ 选择  ·  Enter 确认  ·  ESC 关闭</div>
+  </div>
+</div>
+<div id="audio-panel" onclick="if(event.target.id==='audio-panel')closeAudioSettings()">
+  <div class="audio-box">
+    <h2>🔊 声音设置</h2>
+    <div class="aud-row">
+      <label>🎵 背景音</label>
+      <input type="range" id="bgm-vol" min="0" max="100" value="50">
+      <span id="bgm-vol-val">50%</span>
+    </div>
+    <div class="aud-row">
+      <label>🔔 效果音</label>
+      <input type="range" id="sfx-vol" min="0" max="100" value="70">
+      <span id="sfx-vol-val">70%</span>
+    </div>
+    <button class="audio-close" onclick="closeAudioSettings()">✓ 确定</button>
+    <div class="hint">拖动滑块调节音量</div>
   </div>
 </div>
 <audio id="bgmPlayer" loop preload="auto" style="display:none"></audio>
@@ -329,6 +361,15 @@ function cnTextWidth(text, pixel) {
 // ═══ 音效系统设置 ═══
 let sfxVolume = 0.7;
 let musicVolume = 0.5;
+// 加载本地存储的音量
+try {
+  const saved = JSON.parse(localStorage.getItem('duoRunnerAudio') || '{}');
+  if (typeof saved.sfx === 'number') sfxVolume = saved.sfx;
+  if (typeof saved.bgm === 'number') musicVolume = saved.bgm;
+} catch(e) {}
+function saveAudioSettings() {
+  try { localStorage.setItem('duoRunnerAudio', JSON.stringify({sfx: sfxVolume, bgm: musicVolume})); } catch(e) {}
+}
 
 // ═══ 音效系统（Web Audio API 合成） ═══
 let audioCtx = null;
@@ -525,8 +566,12 @@ let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [], MONSTERS = [];
 let FLAG = {x:0,y:0,w:0,h:0};
 let currentLevel = 1;
 let menuSelection = 1;
+let menuMode = 'main'; // main = 主菜单（START/SETTINGS）| level = 选关菜单
 let charSelect = 0; // 0=男 1=女 2=猫 3=机器人
-const CHAR_NAMES = ['👦 男孩','👧 女孩','🐱 橘猫','🤖 机器人'];
+let menuBtnSel = 0; // 0=START 1=SETTINGS
+const CHAR_NAMES = ['BOY','GIRL','CAT','ROBOT'];
+const CHAR_LABELS = ['男孩','女孩','小猫','机器人'];
+const CHAR_COLORS = ['#e44','#5bf','#fb5','#888'];
 let levelTimer = 0;
 let finalScore = 0;
 let monsterKills = 0;
@@ -569,6 +614,8 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
     if (gameState === 'settings') {
       closeSettings(); // 关闭 → 回到原状态
+    } else if (gameState === 'audiosettings') {
+      closeAudioSettings(); // 关闭声音设置
     } else if (gameState === 'playing' || gameState === 'dead' || gameState === 'win') {
       openSettings();  // 打开
     }
@@ -585,16 +632,36 @@ document.addEventListener('keydown', e => {
     return; // 设置面板打开时其他键屏蔽
   }
 
-  // 菜单控制：数字键或方向键选关
+  // 菜单控制：主菜单模式（START/SETTINGS）或 选关模式
   if (gameState === 'menu') {
-    if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); return; }
-    if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); return; }
-    if (e.code === 'Digit3' || e.code === 'Numpad3') { loadLevel(3); return; }
-    if (e.code === 'Digit4' || e.code === 'Numpad4') { loadLevel(4); return; }
-    if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); return; }
+    if (menuMode === 'main') {
+      // 主菜单：↑↓ 切换按钮（上下排列），Enter 确认
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') { menuBtnSel = 0; return; }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') { menuBtnSel = 1; return; }
+      if (e.code === 'Tab') { menuBtnSel = 1 - menuBtnSel; return; }
+      if (e.code === 'Enter' || e.code === 'Space') {
+        if (menuBtnSel === 0) {
+          // START → 进入选关
+          menuMode = 'level';
+          menuSelection = 1;
+        } else {
+          // SETTINGS → 打开声音设置
+          openAudioSettings();
+        }
+        return;
+      }
+      return;
+    }
+    // 选关模式
+    if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); playBGM(); return; }
+    if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); playBGM(); return; }
+    if (e.code === 'Digit3' || e.code === 'Numpad3') { loadLevel(3); playBGM(); return; }
+    if (e.code === 'Digit4' || e.code === 'Numpad4') { loadLevel(4); playBGM(); return; }
+    if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); playBGM(); return; }
     if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; return; }
     if (e.code === 'ArrowRight' || e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; return; }
     if (e.code === 'Tab') { charSelect = (charSelect+1)%4; return; }
+    if (e.code === 'Backspace') { menuMode = 'main'; return; }
     if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); playBGM(); return; }
   }
   // 胜利菜单控制
@@ -647,6 +714,7 @@ function handleSettingsAct(act) {
   } else if (act === 'menu') {
     // 回到主页菜单
     gameState = 'menu';
+    menuMode = 'main';
     prevGameState = '';
     setBodyState();
     // 清理内联 display，让 CSS class 控制显隐
@@ -681,6 +749,78 @@ document.querySelectorAll('#settings-panel .opt').forEach((btn, idx) => {
 });
 
 /* ============================================
+ * 声音设置面板（主菜单的 SETTINGS 按钮）
+ * ============================================ */
+function openAudioSettings() {
+  prevGameState = gameState;
+  gameState = 'audiosettings';
+  setBodyState();
+  // 同步滑块当前值
+  const bgm = document.getElementById('bgm-vol');
+  const sfx = document.getElementById('sfx-vol');
+  if (bgm) bgm.value = Math.round(musicVolume * 100);
+  if (sfx) sfx.value = Math.round(sfxVolume * 100);
+  const bgmVal = document.getElementById('bgm-vol-val');
+  const sfxVal = document.getElementById('sfx-vol-val');
+  if (bgmVal) bgmVal.textContent = Math.round(musicVolume * 100) + '%';
+  if (sfxVal) sfxVal.textContent = Math.round(sfxVolume * 100) + '%';
+}
+function closeAudioSettings() {
+  gameState = prevGameState || 'menu';
+  prevGameState = '';
+  setBodyState();
+}
+// 滑块事件
+document.addEventListener('DOMContentLoaded', () => {
+  const bgm = document.getElementById('bgm-vol');
+  const sfx = document.getElementById('sfx-vol');
+  if (bgm) {
+    bgm.addEventListener('input', (e) => {
+      musicVolume = parseInt(e.target.value) / 100;
+      document.getElementById('bgm-vol-val').textContent = e.target.value + '%';
+      updateBGMVolume();
+      saveAudioSettings();
+    });
+  }
+  if (sfx) {
+    sfx.addEventListener('input', (e) => {
+      sfxVolume = parseInt(e.target.value) / 100;
+      document.getElementById('sfx-vol-val').textContent = e.target.value + '%';
+      saveAudioSettings();
+      // 试听一下
+      playTone(660, 0.08, 'sine', 1);
+    });
+  }
+});
+// 立即初始化（因为 script 在 body 末尾，DOM 已就绪）
+(function initAudioSliders(){
+  const bgm = document.getElementById('bgm-vol');
+  const sfx = document.getElementById('sfx-vol');
+  if (bgm) {
+    bgm.value = Math.round(musicVolume * 100);
+    bgm.addEventListener('input', (e) => {
+      musicVolume = parseInt(e.target.value) / 100;
+      document.getElementById('bgm-vol-val').textContent = e.target.value + '%';
+      updateBGMVolume();
+      saveAudioSettings();
+    });
+  }
+  if (sfx) {
+    sfx.value = Math.round(sfxVolume * 100);
+    sfx.addEventListener('input', (e) => {
+      sfxVolume = parseInt(e.target.value) / 100;
+      document.getElementById('sfx-vol-val').textContent = e.target.value + '%';
+      saveAudioSettings();
+      playTone(660, 0.08, 'sine', 1);
+    });
+  }
+  const bgmVal = document.getElementById('bgm-vol-val');
+  const sfxVal = document.getElementById('sfx-vol-val');
+  if (bgmVal) bgmVal.textContent = Math.round(musicVolume * 100) + '%';
+  if (sfxVal) sfxVal.textContent = Math.round(sfxVolume * 100) + '%';
+})();
+
+/* ============================================
  * 碰撞检测
  * ============================================ */
 function rectCollide(a, b) {
@@ -709,9 +849,10 @@ function update() {
   try {
   // 设置面板打开时：完全暂停（不计时、不更新物理）
   if (gameState === 'settings') return;
+  if (gameState === 'audiosettings') return;
   if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
-    if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
+    if (keys['Enter']) { keys['Enter'] = false; }
     return;
   }
   if (gameState === 'win') { winTimer++; if (winTimer>300) { gameState='menu'; document.getElementById('msg').style.opacity='0'; } return; }
@@ -1070,6 +1211,105 @@ function resetLevel() {
 }
 
 /* ============================================
+ * 角色精灵系统（4 角色 × 2 帧 = 8 张像素图）
+ *   供菜单展示与关卡渲染共用，确保形象完全一致
+ * ============================================ */
+// 调色板: 0透明 1发色 2发暗 3肤色 4肤暗 5眼白 6瞳 7嘴
+//         8白T 9T暗 A牛仔裤 B裤亮 C鞋面 D鞋底 E金 F白 G黑发
+//         H I发带 J K橙 L浅黄 F白 M N O灰 P红眼 Q深灰
+const C = [null,'#4a3728','#2a1a10','#ffe8c0','#e8c8a0','#fff','#111','#c44',
+           '#f8f8f8','#ddd','#3058d8','#5080f0','#e8e8e8','#444','#fd0','#fff','#1a1a1a','#111','#ff4080','#111','#f09030','#ffd060','#888','#ff4444','#333'];
+const PS = 2; // 每像素 2px
+// 男性精灵 [17×17]
+const spMStand = [
+  '00011111111100','00111111111110','01122222222211','01111111111111',
+  '11115333333511','11153666335111','11113636335111','11113333337111',
+  '08888888888880','08888888888880','08999999999980','0AAABBBBAAAB0',
+  '0AAABBBBAAAB0','0AAABBBBAAAB0','0AAABBBBAAAB0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+const spMAir = [
+  '00011111111100','00111111111110','01122222222211','03531111111353',
+  '11153666335111','11113636335111','11113333337111','08888888888880',
+  '08888888888880','08999999999980','0AAABBBBAAAB0','0AA0BBB0AAAB0',
+  '0AA0BBB0AAAB0','0AA0BBB0AAAB0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+// 女性精灵（黑色长发+粉色发带+裙子）
+const spFStand = [
+  '00IIGGGGGGII00','0IIGGGGGGGGII0','0IG11111111GI0','0IG11111111GI0',
+  '0I1153333335I0','01I536663351I0','01113636335110','01113333337110',
+  '08888888888880','08999999999980','0IIIIIIIIIIII0','0AAABBBBAAAB0',
+  '0AAABBBBAAAB0','0AAABBBBAAAB0','0AAABBBBAAAB0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+const spFAir = [
+  '00IIGGGGGGII00','0IIGGGGGGGGII0','0IG11111111GI0','0IG11111111GI0',
+  '0I3533333353I0','01I536663351I0','01113636335110','01113333337110',
+  '08888888888880','08999999999980','0IIIIIIIIIIII0','0AAABBBBAAAB0',
+  '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0AA0BBB0AAAB0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+// 猫精灵（K橙 L浅黄 F白 3肤——纯猫无衣服）
+const spCatStand = [
+  '00KKKKKKKKKK00','0KKKKKKKKKKKK0','0KKKKKFFKKKKK0','0KKKKKFFKKKKK0',
+  '00KKK3663KKK00','00KKK3663KKK00','00KKK3663KKK00','00FF333333FF00',
+  '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0LLKKKKKKKKLL0','0KKKKKKKKKKKK0',
+  '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0KKKKKKKKKKKK0',
+  '00KKKKKKKKKK00','000KKKKKKKK000',
+];
+const spCatAir = [
+  '00KKKKKKKKKK00','0KKKKKKKKKKKK0','0KKKKKFFKKKKK0','0KKKKKFFKKKKK0',
+  '00KKK3663KKK00','00KKK3663KKK00','00KKK3663KKK00','00FF333333FF00',
+  '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0LLKKKKKKKKLL0','0KKKKKKKKKKKK0',
+  '0KKK0KKKK0KKK0','0KKK0KKKK0KKK0','0KKK0KKKK0KKK0',
+  '00KKKKKKKKKK00','000KKKKKKKK000',
+];
+// 机器人（O灰 P红眼 Q深灰）
+const spRobotStand = [
+  '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
+  '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
+  '08888888888880','08999999999980','0AAAAABBBBAAA0','0AAABBBBAAAB0',
+  '0AAABBBBAAAB0','0AAABBBBAAAB0','0OOQQQQQQQQOO0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+const spRobotAir = [
+  '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
+  '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
+  '08888888888880','08999999999980','0AAAAABBBBAAA0','0AA0BBB0AAAB0',
+  '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0OOQQQQQQQQOO0',
+  '00CCDDDDDDCC00','000DDDDDDDD000',
+];
+const ALL_SPRITES = [
+  {stand:spMStand, air:spMAir},
+  {stand:spFStand, air:spFAir},
+  {stand:spCatStand, air:spCatAir},
+  {stand:spRobotStand, air:spRobotAir},
+];
+
+/**
+ * 用统一的精灵系统绘制一个角色（17×17 像素，PS=2 缩放，脚底 = py + 38）
+ * @param {number} px  左上角 x
+ * @param {number} py  左上角 y（脚底 = py+38，so py = GROUND_Y - 38 可让脚贴地）
+ * @param {number} charIdx  角色索引 0=男 1=女 2=猫 3=机器人
+ * @param {boolean} flipX  是否水平翻转
+ * @param {boolean} inAir  true=空中帧（腿分开）false=站立帧（腿并拢）
+ */
+function drawCharSprite(px, py, charIdx, flipX, inAir) {
+  const sp = ALL_SPRITES[charIdx] || ALL_SPRITES[0];
+  const sprite = inAir ? sp.air : sp.stand;
+  for (let sy=0; sy<sprite.length; sy++) {
+    for (let sx=0; sx<sprite[sy].length; sx++) {
+      const ci = sprite[sy][sx], c = C[parseInt(ci,36)];
+      if (!c) continue;
+      ctx.fillStyle = c;
+      const dx = flipX ? (CHAR_W - (sx+1)*PS) : sx*PS;
+      ctx.fillRect(px+dx, py+4+sy*PS, PS, PS);
+    }
+  }
+}
+
+/* ============================================
  * 渲染
  * ============================================ */
 function draw() {
@@ -1146,13 +1386,13 @@ function draw() {
       ctx.fillRect(gx + 1, GROUND_Y + 6, 6, 2);
     }
 
-    // ── 标题：纯像素英语 "DOUBLE RUNNER!" 两行 ──
+    // ── 标题：纯像素英语 "DOUBLE RUNNER!?" 两行 ──
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const t = Date.now() / 400;
     const bounce = Math.sin(t) * 3;
     const title1 = 'DOUBLE';
-    const title2 = 'RUNNER!';
+    const title2 = 'RUNNER!?';
     const pixel = 6;
     const w1 = pixelTextWidth(title1, pixel);
     const w2 = pixelTextWidth(title2, pixel);
@@ -1197,11 +1437,226 @@ function draw() {
     drawPixelStar(x1 - 26, y1 + 14, 3, '#fd0');
     drawPixelStar(x1 + w1 + 16, y1 + 14, 3, '#fd0');
 
-    // ── 关卡模块：圆角像素风 + 上下浮动 ──
+    // ── 角色选择器：单显示当前角色 + 上下滚动提示（仅选关模式显示） ──
+    // 位置：第 4/5 关上方（黑色框位置）
+    const charSelX = 600, charSelY = 168;
+    if (menuMode === 'level') {
+    const charSize = 36;          // 单个方块更大
+    const cx = charSelX;
+    const cy = charSelY;
+    const i = charSelect;
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    fillRoundRect(cx + 2, cy + 3, charSize, charSize, 6);
+    // 主体
+    ctx.fillStyle = CHAR_COLORS[i];
+    fillRoundRect(cx, cy, charSize, charSize, 6);
+    // 像素图标
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    if (i === 0) {
+      // 男孩：头+身体
+      ctx.fillRect(cx + 12, cy + 7, 12, 12);
+      ctx.fillRect(cx + 9, cy + 19, 18, 12);
+    } else if (i === 1) {
+      // 女孩：头+辫子+裙
+      ctx.fillRect(cx + 12, cy + 7, 12, 12);
+      ctx.fillRect(cx + 8, cy + 10, 3, 9);
+      ctx.fillRect(cx + 25, cy + 10, 3, 9);
+      ctx.fillRect(cx + 10, cy + 19, 16, 12);
+    } else if (i === 2) {
+      // 猫：三角耳+猫脸+身体
+      ctx.beginPath(); ctx.moveTo(cx + 7, cy + 9); ctx.lineTo(cx + 12, cy + 2); ctx.lineTo(cx + 17, cy + 9); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx + 19, cy + 9); ctx.lineTo(cx + 24, cy + 2); ctx.lineTo(cx + 29, cy + 9); ctx.fill();
+      ctx.fillRect(cx + 10, cy + 8, 16, 13);
+      ctx.fillRect(cx + 8, cy + 20, 20, 11);
+    } else {
+      // 机器人：天线+方头+方身
+      ctx.fillRect(cx + 17, cy + 1, 2, 5);
+      ctx.fillRect(cx + 9, cy + 6, 18, 15);
+      ctx.fillRect(cx + 6, cy + 22, 24, 10);
+      // 眼睛
+      ctx.fillStyle = '#fd0';
+      ctx.fillRect(cx + 13, cy + 12, 3, 3);
+      ctx.fillRect(cx + 20, cy + 12, 3, 3);
+    }
+    // 选中描边（黄色）
+    ctx.strokeStyle = '#fd0'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + 6, cy);
+    ctx.lineTo(cx + charSize - 6, cy);
+    ctx.arcTo(cx + charSize, cy, cx + charSize, cy + 6, 6);
+    ctx.lineTo(cx + charSize, cy + charSize - 6);
+    ctx.arcTo(cx + charSize, cy + charSize, cx + charSize - 6, cy + charSize, 6);
+    ctx.lineTo(cx + 6, cy + charSize);
+    ctx.arcTo(cx, cy + charSize, cx, cy + charSize - 6, 6);
+    ctx.lineTo(cx, cy + 6);
+    ctx.arcTo(cx, cy, cx + 6, cy, 6);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+
+    // 上方三角箭头（提示可向上滚到上一个）
+    const upTriY = cy - 10;
+    ctx.fillStyle = Math.floor(Date.now() / 350) % 2 === 0 ? '#fd0' : 'rgba(255,221,0,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(cx + charSize / 2, upTriY);
+    ctx.lineTo(cx + charSize / 2 - 6, upTriY + 6);
+    ctx.lineTo(cx + charSize / 2 + 6, upTriY + 6);
+    ctx.closePath();
+    ctx.fill();
+    // 下方三角箭头（提示可向下滚到下一个）
+    const downTriY = cy + charSize + 10;
+    ctx.fillStyle = Math.floor(Date.now() / 350) % 2 === 0 ? 'rgba(255,221,0,0.4)' : '#fd0';
+    ctx.beginPath();
+    ctx.moveTo(cx + charSize / 2, downTriY);
+    ctx.lineTo(cx + charSize / 2 - 6, downTriY - 6);
+    ctx.lineTo(cx + charSize / 2 + 6, downTriY - 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // 角色名 + Tab 切换提示（方块右侧）
+    const hintX = cx + charSize + 12;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    // 角色名（统一白色）
+    ctx.font = 'bold 16px -apple-system';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(CHAR_LABELS[charSelect], hintX, cy + charSize / 2 - 6);
+    // Tab 提示：键位小方块 + 文字
+    const tabKeyX = hintX, tabKeyY = cy + charSize / 2 + 10;
+    // 键位小方块
+    ctx.fillStyle = '#222';
+    ctx.fillRect(tabKeyX, tabKeyY, 22, 14);
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
+    ctx.strokeRect(tabKeyX + 0.5, tabKeyY + 0.5, 21, 13);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tab', tabKeyX + 11, tabKeyY + 7);
+    // "切换"文字
+    ctx.textAlign = 'left';
+    ctx.font = '11px -apple-system';
+    ctx.fillStyle = '#fd0';
+    ctx.fillText('切换', tabKeyX + 28, tabKeyY + 7);
+    ctx.textBaseline = 'alphabetic';
+    } // end if (menuMode === 'level') 角色选择器
+
+    // ── 4 角色原地踏步展示（与关卡内同款精灵，从右到左：男→女→猫→机器人） ──
+    const walkX0 = 600;          // 最右角色 x
+    const walkGap = 38;          // 间距（精灵宽 34，留 4px 间隔）
+    const walkTime = Date.now() / 220;
+    for (let k = 0; k < 4; k++) {
+      // 从右到左：k=0 在最右（男），k=3 在最左（机器人）
+      const wx = walkX0 + (3 - k) * walkGap;
+      const charIdx = k;
+      // 踏步节奏：交替空中帧/站立帧
+      const stepPhase = walkTime + k * 0.5;
+      const inAir = Math.sin(stepPhase) > 0;
+      // 脚底 = GROUND_Y：精灵底部 = py + 4 + 17*2 = py + 38，所以 py = GROUND_Y - 38（让脚真正贴地）
+      const py = GROUND_Y - 38;
+      // 阴影（贴在脚底下方 1px，地面之上）
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(wx + CHAR_W/2, GROUND_Y - 1, 12, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 调用统一精灵（面朝右，不翻转）
+      drawCharSprite(wx, py, charIdx, false, inAir);
+    }
+
+    // ── 关卡模块：圆角像素风 + 上下浮动（仅在选关模式显示） ──
     const cardW = 130, cardH = 130, cardGap = 18, cardR = 6;
     const totalCardsW = cardW * totalLevels + cardGap * (totalLevels - 1);
     const cardsStartX = (CANVAS_W - totalCardsW) / 2;
     const cardsBaseY = 220;
+    if (menuMode === 'main') {
+      // ── 主菜单：START 在红框位置（标题正下方），SETTINGS 在绿框位置（START 下方） ──
+      // 按钮尺寸与位置
+      const btnW = 280, btnH = 44;
+      const btnStartX = (CANVAS_W - btnW) / 2;
+      const btnY0 = 248; // START 按钮 y（红框 y=240-310 中间）
+      const btnY1 = 320; // SETTINGS 按钮 y（绿框 y=320-360 中间）
+      const btnYs = [btnY0, btnY1];
+      const labels = ['START', 'SETTINGS'];
+      const icons  = ['▶', '⚙'];
+      for (let bi = 0; bi < 2; bi++) {
+        const bx = btnStartX;
+        const by = btnYs[bi];
+        const sel = (bi === menuBtnSel);
+        // 像素卡通风按钮：4 层叠加（黑边框 → 暗色底层 → 主体 → 顶部高光），全部方角无圆角
+        // 调色板：马里奥式砖块按钮
+        const colOuter = sel ? '#5a3a00' : '#000';           // 外深框
+        const colDark  = sel ? '#c80'    : '#1a1a2a';         // 底色 / 选中时的暗边
+        const colMain  = sel ? '#fd0'    : '#3a3a4a';         // 主体
+        const colHi    = sel ? '#ffe860' : '#5a5a6a';         // 顶部高光
+        // 1. 黑色硬阴影（右下偏移 4px）
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(bx + 4, by + 4, btnW, btnH);
+        // 2. 外深边框
+        ctx.fillStyle = colOuter;
+        ctx.fillRect(bx - 2, by - 2, btnW + 4, btnH + 4);
+        // 3. 暗色底（底部 4px）
+        ctx.fillStyle = colDark;
+        ctx.fillRect(bx, by, btnW, btnH);
+        // 4. 主体
+        ctx.fillStyle = colMain;
+        ctx.fillRect(bx, by, btnW, btnH - 6);
+        // 5. 顶部高光（顶部 4px，更亮）
+        ctx.fillStyle = colHi;
+        ctx.fillRect(bx, by, btnW, 4);
+        // 6. 左右内嵌阴影（各 2px）
+        ctx.fillStyle = colDark;
+        ctx.fillRect(bx, by, 2, btnH);
+        ctx.fillRect(bx + btnW - 2, by, 2, btnH);
+        // 7. 像素铆钉（左上 + 右下）
+        ctx.fillStyle = colOuter;
+        ctx.fillRect(bx + 2, by + 2, 2, 2);
+        ctx.fillRect(bx + btnW - 4, by + btnH - 4, 2, 2);
+        // 8. 选中时整体加亮 + 4 角闪光
+        if (sel) {
+          // 4 角闪烁小方块
+          const blink = Math.floor(Date.now() / 250) % 2 === 0;
+          if (blink) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(bx - 4, by - 4, 3, 3);
+            ctx.fillRect(bx + btnW + 1, by - 4, 3, 3);
+            ctx.fillRect(bx - 4, by + btnH + 1, 3, 3);
+            ctx.fillRect(bx + btnW + 1, by + btnH + 1, 3, 3);
+          }
+        }
+        // 文字（用普通字体，按钮放大后字号也加大）
+        const text = labels[bi];
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = sel ? '#000' : '#fff';
+        // 图标和文字：分两段绘制，确保居中
+        const iconStr = icons[bi] || '';
+        const textStr = text;
+        ctx.font = 'bold 18px -apple-system';
+        const iconW = ctx.measureText(iconStr).width;
+        ctx.font = 'bold 20px -apple-system';
+        const txtW = ctx.measureText(textStr).width;
+        const gap2 = 10;
+        const totalStrW = iconW + gap2 + txtW;
+        const strStartX = bx + (btnW - totalStrW) / 2;
+        ctx.font = 'bold 18px -apple-system';
+        ctx.fillText(iconStr, strStartX + iconW / 2, by + btnH / 2 - 2);
+        ctx.font = 'bold 20px -apple-system';
+        ctx.fillText(textStr, strStartX + iconW + gap2 + txtW / 2, by + btnH / 2 - 2);
+      }
+      // 提示文字
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '11px -apple-system';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText('↑ ↓ 切换  ·  Enter 确认', CANVAS_W / 2, btnY1 + btnH + 14);
+    } else {
+      // 选关模式提示
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '11px -apple-system';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText('← ↑ ↓ → 选关  ·  Enter 进入  ·  Backspace 返回', CANVAS_W / 2, cardsBaseY + 165);
+    }
     // 不同关卡用不同色调
     const levelColors = [
       ['#5b9ee0', '#3b7ec0'], // 1 教学 - 蓝
@@ -1229,6 +1684,7 @@ function draw() {
       ctx.fill();
     }
     for (let i = 1; i <= totalLevels; i++) {
+      if (menuMode !== 'level') break; // 主菜单不渲染关卡卡片
       const x = cardsStartX + (i - 1) * (cardW + cardGap);
       // 上下浮动：每个关卡相位错开，更动感
       const phase = i * 0.6;
@@ -1312,8 +1768,10 @@ function draw() {
     // ── 底部操作提示 ──
     ctx.font = '13px -apple-system'; ctx.fillStyle = '#ff0';
     const hintY = cardsBaseY + cardH + 40;
-    ctx.fillStyle = '#fff'; ctx.font = '12px -apple-system';
-    ctx.fillText('Tab 切换('+CHAR_NAMES[charSelect]+')  |  ←↑↓→ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, hintY);
+    if (menuMode === 'level') {
+      ctx.fillStyle = '#fff'; ctx.font = '12px -apple-system';
+      ctx.fillText('← ↑ ↓ → 选关  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关  ·  Backspace 返回', CANVAS_W/2, hintY);
+    }
     if (window._err) { ctx.fillStyle='#f44'; ctx.font='12px monospace'; ctx.fillText('错误: '+window._err, CANVAS_W/2, hintY+20); }
     ctx.textAlign = 'left'; return;
   }
@@ -1438,7 +1896,6 @@ function draw() {
     const p = player, px=p.x, py=p.y, inAir=!p.onGround;
     const dir = dashTimer>0 ? dashDir : (p.vx!==0 ? (p.vx>0?1:-1) : (p.dir||1));
     p.dir = dir; const flipX = dir < 0;
-    const PS = 2; // 每像素2px
 
     // 冲刺冷却条
     if (dashCooldown > 0) {
@@ -1449,92 +1906,11 @@ function draw() {
       ctx.fillStyle='#fb5'; ctx.fillRect(px,py-10,CHAR_W,4);
     }
 
-    // 调色板: 0透明 1发色 2发暗 3肤色 4肤暗 5眼白 6瞳 7嘴
-    //         8白T 9T暗 A牛仔裤 B裤亮 C鞋面 D鞋底 E金 F白 G黑发
-    const C = [null,'#4a3728','#2a1a10','#ffe8c0','#e8c8a0','#fff','#111','#c44',
-               '#f8f8f8','#ddd','#3058d8','#5080f0','#e8e8e8','#444','#fd0','#fff','#1a1a1a','#111','#ff4080','#111','#f09030','#ffd060','#888','#ff4444','#333'];
-    // 男性精灵 [17×14]
-    const spMStand = [
-      '00011111111100','00111111111110','01122222222211','01111111111111',
-      '11115333333511','11153666335111','11113636335111','11113333337111',
-      '08888888888880','08888888888880','08999999999980','0AAABBBBAAAB0',
-      '0AAABBBBAAAB0','0AAABBBBAAAB0','0AAABBBBAAAB0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    const spMAir = [
-      '00011111111100','00111111111110','01122222222211','03531111111353',
-      '11153666335111','11113636335111','11113333337111','08888888888880',
-      '08888888888880','08999999999980','0AAABBBBAAAB0','0AA0BBB0AAAB0',
-      '0AA0BBB0AAAB0','0AA0BBB0AAAB0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    // 女性精灵（黑色长发+粉色发带+裙子）
-    const spFStand = [
-      '00IIGGGGGGII00','0IIGGGGGGGGII0','0IG11111111GI0','0IG11111111GI0',
-      '0I1153333335I0','01I536663351I0','01113636335110','01113333337110',
-      '08888888888880','08999999999980','0IIIIIIIIIIII0','0AAABBBBAAAB0',
-      '0AAABBBBAAAB0','0AAABBBBAAAB0','0AAABBBBAAAB0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    const spFAir = [
-      '00IIGGGGGGII00','0IIGGGGGGGGII0','0IG11111111GI0','0IG11111111GI0',
-      '0I3533333353I0','01I536663351I0','01113636335110','01113333337110',
-      '08888888888880','08999999999980','0IIIIIIIIIIII0','0AAABBBBAAAB0',
-      '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0AA0BBB0AAAB0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    // 猫精灵（K橙 L浅黄 F白 3肤——纯猫无衣服）
-    const spCatStand = [
-      '00KKKKKKKKKK00','0KKKKKKKKKKKK0','0KKKKKFFKKKKK0','0KKKKKFFKKKKK0',
-      '00KKK3663KKK00','00KKK3663KKK00','00KKK3663KKK00','00FF333333FF00',
-      '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0LLKKKKKKKKLL0','0KKKKKKKKKKKK0',
-      '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0KKKKKKKKKKKK0',
-      '00KKKKKKKKKK00','000KKKKKKKK000',
-    ];
-    const spCatAir = [
-      '00KKKKKKKKKK00','0KKKKKKKKKKKK0','0KKKKKFFKKKKK0','0KKKKKFFKKKKK0',
-      '00KKK3663KKK00','00KKK3663KKK00','00KKK3663KKK00','00FF333333FF00',
-      '0KKKKKKKKKKKK0','0KKKKKKKKKKKK0','0LLKKKKKKKKLL0','0KKKKKKKKKKKK0',
-      '0KKK0KKKK0KKK0','0KKK0KKKK0KKK0','0KKK0KKKK0KKK0',
-      '00KKKKKKKKKK00','000KKKKKKKK000',
-    ];
-    // 机器人（O灰 P红眼 Q深灰）
-    const spRobotStand = [
-      '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
-      '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
-      '08888888888880','08999999999980','0AAAAABBBBAAA0','0AAABBBBAAAB0',
-      '0AAABBBBAAAB0','0AAABBBBAAAB0','0OOQQQQQQQQOO0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    const spRobotAir = [
-      '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
-      '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
-      '08888888888880','08999999999980','0AAAAABBBBAAA0','0AA0BBB0AAAB0',
-      '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0OOQQQQQQQQOO0',
-      '00CCDDDDDDCC00','000DDDDDDDD000',
-    ];
-    const ALL_SPRITES = [
-      {stand:spMStand, air:spMAir},
-      {stand:spFStand, air:spFAir},
-      {stand:spCatStand, air:spCatAir},
-      {stand:spRobotStand, air:spRobotAir},
-    ];
-    const sp = ALL_SPRITES[charSelect] || ALL_SPRITES[0];
-    const sprite = inAir ? sp.air : sp.stand;
-
     // 阴影
     ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(px+4,py+CHAR_H-2,20,4);
 
-    // 绘制像素
-    for (let sy=0; sy<sprite.length; sy++) {
-      for (let sx=0; sx<sprite[sy].length; sx++) {
-        const ci = sprite[sy][sx], c = C[parseInt(ci,36)];
-        if (!c) continue;
-        ctx.fillStyle = c;
-        const dx = flipX ? (CHAR_W - (sx+1)*PS) : sx*PS;
-        ctx.fillRect(px+dx, py+4+sy*PS, PS, PS);
-      }
-    }
+    // 调用统一精灵绘制函数（与菜单展示完全一致）
+    drawCharSprite(px, py, charSelect, flipX, inAir);
 
     // 冲刺速度线
     if (dashTimer>0){ctx.fillStyle='rgba(255,255,255,0.6)';for(let i=0;i<3;i++)ctx.fillRect(flipX?px-10:px+CHAR_W,py+14+i*8,10,3)}
