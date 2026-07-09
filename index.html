@@ -527,31 +527,75 @@ function draw() {
   }
   if (showChar) {
     const p = player;
+    // 方向：根据vx或冲刺方向
+    const dir = dashTimer>0 ? dashDir : (p.vx!==0 ? (p.vx>0?1:-1) : (p.dir||1));
+    p.dir = dir;
+    const flipX = dir < 0;
+    function d(x,y,w,h){ // 像素矩形（支持翻转）
+      const sx = flipX ? p.x+CHAR_W-(x-p.x)-w : x;
+      ctx.fillRect(sx, y, w, h);
+    }
+    const px=p.x, py=p.y;
+    const inAir = !p.onGround;
+
     // 阴影
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+4, p.y+CHAR_H-2, 20, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(px+4, py+CHAR_H-2, 20, 4);
+
     // 帽子（红色）
     ctx.fillStyle = dashTimer>0?'#ff8888':'#e83030';
-    ctx.fillRect(p.x+4, p.y-3, 20, 8);
-    ctx.fillRect(p.x+2, p.y+2, 26, 5);
+    d(px+4, py-3, 20, 8);
+    d(px+2, py+2, 26, 5);
+
     // 脸
-    ctx.fillStyle = '#ffe8c0'; ctx.fillRect(p.x+4, p.y+5, 20, 12);
-    // 眼睛
-    ctx.fillStyle = '#000'; ctx.fillRect(p.x+18, p.y+8, 4, 4);
-    // 胡子（棕色）
-    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.x+2, p.y+14, 8, 4); ctx.fillRect(p.x+18, p.y+14, 8, 4);
-    // 身体（红色衬衫 + 蓝色背带裤）
-    ctx.fillStyle = '#e83030'; ctx.fillRect(p.x+4, p.y+17, 20, 6);
-    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+4, p.y+23, 20, 6);
-    // 背带
-    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+6, p.y+17, 4, 12); ctx.fillRect(p.x+18, p.y+17, 4, 12);
-    // 腿
-    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+4, p.y+29, 8, 6); ctx.fillRect(p.x+16, p.y+29, 8, 6);
-    // 鞋
-    ctx.fillStyle = '#6b3020'; ctx.fillRect(p.x+2, p.y+34, 10, 4); ctx.fillRect(p.x+16, p.y+34, 10, 4);
+    ctx.fillStyle = '#ffe8c0';
+    d(px+4, py+5, 20, 12);
+
+    // 眼睛（面朝方向）
+    ctx.fillStyle = '#000';
+    if (dir>0) { ctx.fillRect(px+18, py+8, 4, 4); }
+    else { ctx.fillRect(px+6, py+8, 4, 4); }
+
+    // 胡子
+    ctx.fillStyle = '#8b5a2b';
+    d(px+4, py+14, 8, 4); d(px+16, py+14, 8, 4);
+
+    // 身体（红色衬衫）
+    ctx.fillStyle = '#e83030';
+    d(px+4, py+17, 20, 6);
+
+    // 跳跃姿势：手臂上举
+    if (inAir) {
+      ctx.fillStyle = '#ffe8c0';
+      d(px+2, py+12, 6, 8); d(px+20, py+12, 6, 8); // 手臂
+      // 腿分开
+      ctx.fillStyle = '#3858e8';
+      d(px+2, py+29, 8, 6); d(px+18, py+29, 8, 6);
+      ctx.fillStyle = '#6b3020';
+      d(px, py+34, 10, 4); d(px+18, py+34, 10, 4);
+    } else {
+      // 站立/行走：手臂自然下垂
+      ctx.fillStyle = '#ffe8c0';
+      d(px+4, py+16, 5, 6); d(px+19, py+16, 5, 6);
+      // 腿
+      ctx.fillStyle = '#3858e8';
+      d(px+4, py+29, 8, 6); d(px+16, py+29, 8, 6);
+      ctx.fillStyle = '#6b3020';
+      d(px+2, py+34, 10, 4); d(px+16, py+34, 10, 4);
+    }
+
+    // 蓝色背带裤
+    ctx.fillStyle = '#3858e8';
+    d(px+4, py+23, 20, 6);
+    ctx.fillStyle = '#3858e8';
+    d(px+6, py+17, 4, 12); d(px+18, py+17, 4, 12);
+
     // 冲刺速度线
     if (dashTimer > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      for (let i=0; i<3; i++) ctx.fillRect(p.x+CHAR_W, p.y+14+i*8, 10, 3);
+      for (let i=0; i<3; i++) {
+        ctx.fillRect(flipX?px-10:px+CHAR_W, py+14+i*8, 10, 3);
+      }
     }
     // 空中跳跃特效
     if (!p.onGround && p.jumpsUsed >= 2) {
