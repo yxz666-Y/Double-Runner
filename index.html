@@ -37,7 +37,8 @@ const FAST_FALL    = 0.8;    // 快速下落额外加速度
 const DASH_SPEED   = 12;     // 冲刺速度
 const DASH_DURATION= 8;      // 冲刺持续帧数
 const DASH_COOLDOWN= 60;     // 冲刺冷却帧数
-const DJ_WINDOW    = 18;     // 二段跳时间窗（帧数，约300ms@60fps）
+const DJ_WINDOW    = 30;     // 二段跳时间窗（帧数，约500ms@60fps）
+const DASH_WINDOW  = 15;     // 冲刺就绪窗（P1按A/D后P2有15帧时间按箭头）
 const GROUND_Y     = 430;    // 地面 y 坐标
 const CHAR_W = 28, CHAR_H = 38; // 角色尺寸
 
@@ -62,6 +63,8 @@ let particles = [];
 let dashTimer = 0;           // 冲刺剩余帧数（>0=冲刺中）
 let dashCooldown = 0;        // 冲刺冷却剩余帧数
 let dashDir = 0;             // 冲刺方向：-1左 1右
+let dashReadyL = 0;          // 左冲刺就绪窗（P1按A后倒计时，>0期间P2可按←触发）
+let dashReadyR = 0;          // 右冲刺就绪窗
 let invincibleTimer = 0;     // 无敌帧剩余
 let djWindow = 0;            // 二段跳时间窗剩余帧数（P2跳跃后开启）
 let p2JumpHeld = false;      // P2是否正在按住跳跃键（防连跳）
@@ -179,24 +182,38 @@ function update() {
     spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fd0', 10);
   }
 
-  /* === 冲刺：P1按住A/D时 P2点按同方向箭头 === */
+  /* === 冲刺：P1按A/D开启就绪窗 → P2在窗内按同方向箭头触发 === */
+  // 就绪窗倒计时
+  if (dashReadyL > 0) dashReadyL--;
+  if (dashReadyR > 0) dashReadyR--;
+
+  // P1按下A或D时开启对应就绪窗
+  if (p1Left  && !keys._prevKeyA) dashReadyL = DASH_WINDOW;
+  if (p1Right && !keys._prevKeyD) dashReadyR = DASH_WINDOW;
+  keys._prevKeyA = p1Left;
+  keys._prevKeyD = p1Right;
+
   if (dashTimer > 0) {
     dashTimer--;
     player.vx = dashDir * DASH_SPEED;
-    invincibleTimer = 3; // 冲刺结束后保留3帧无敌
+    invincibleTimer = 3;
   } else if (dashCooldown > 0) {
     dashCooldown--;
   } else {
-    const dashLeft  = keys['ArrowLeft']  && p1Left  && !keys._prevArrowLeft;
-    const dashRight = keys['ArrowRight'] && p1Right && !keys._prevArrowRight;
-    if (dashLeft) {
+    // 就绪窗内+P2按同方向箭头 → 触发冲刺
+    const dashL = keys['ArrowLeft']  && dashReadyL > 0 && !keys._prevArrowLeft;
+    const dashR = keys['ArrowRight'] && dashReadyR > 0 && !keys._prevArrowRight;
+    // 同时保留原始同步检测（两人刚好同时按下）
+    const syncL = keys['ArrowLeft']  && p1Left  && !keys._prevArrowLeft;
+    const syncR = keys['ArrowRight'] && p1Right && !keys._prevArrowRight;
+    if (dashL || syncL) {
       dashTimer = DASH_DURATION; dashDir = -1; dashCooldown = DASH_COOLDOWN;
-      invincibleTimer = DASH_DURATION + 3;
+      invincibleTimer = DASH_DURATION + 3; dashReadyL = 0;
       spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
     }
-    if (dashRight) {
+    if (dashR || syncR) {
       dashTimer = DASH_DURATION; dashDir = 1; dashCooldown = DASH_COOLDOWN;
-      invincibleTimer = DASH_DURATION + 3;
+      invincibleTimer = DASH_DURATION + 3; dashReadyR = 0;
       spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
     }
   }
