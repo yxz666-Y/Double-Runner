@@ -125,6 +125,7 @@ let currentLevel = 1;
 let menuSelection = 1;
 let levelTimer = 0;
 let finalScore = 0;
+let monsterKills = 0;
 let highScores = {};
 // 加载最高分
 try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}; } catch(e) {}
@@ -143,7 +144,7 @@ function loadLevel(id) {
   if (tag) tag.textContent = '第 ' + id + ' 关';
   player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
   player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
-  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0;
+  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0; monsterKills = 0;
   gameState = 'playing';
 }
 
@@ -367,13 +368,14 @@ function update() {
     const timeBonus = Math.max(0, 500 - seconds * 5);
     const coinBonus = coinsCollected * 50;
     const deathPenalty = deaths * 200;
-    finalScore = 1000 + timeBonus + coinBonus - deathPenalty;
+    const killBonus = monsterKills * 300;
+    finalScore = 1000 + timeBonus + coinBonus + killBonus - deathPenalty;
     if (finalScore < 0) finalScore = 0;
     // 更新最高分
     const prev = highScores[currentLevel] || 0;
     if (finalScore > prev) { highScores[currentLevel] = finalScore; localStorage.setItem('duoRunnerHighScores', JSON.stringify(highScores)); }
     const hasNext = currentLevel < Object.keys(LEVELS).length;
-    showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  💀 '+deaths+
+    showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  👾 '+monsterKills+'  💀 '+deaths+
       '\n'+(hasNext?'Enter 下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
   }
 
