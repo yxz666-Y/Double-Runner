@@ -15,8 +15,6 @@ canvas{display:block;border:1px solid #333}
 </head>
 <body>
 <div id="hud">
-  <span id="p1">P1: A/D 移动 | W 二段跳</span>
-  <span id="p2">P2: ↑ 跳 | ↓ 射击 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
@@ -274,6 +272,21 @@ function update() {
   }
   if (gameState === 'win') { winTimer++; if (winTimer>300) { gameState='menu'; document.getElementById('msg').style.opacity='0'; } return; }
   if (gameState === 'gameover') return;
+  // 'dead' 状态：暂停 60 帧后自动复活到原位
+  if (gameState === 'dead') {
+    deadTimer--;
+    if (deadTimer <= 0) {
+      // 复活：玩家回到最近的安全位置
+      player.x = lastSafeX;
+      player.y = lastSafeY;
+      player.vy = 0; player.vx = 0;
+      player.jumpsUsed = 0;
+      invincibleTimer = 90;
+      gameState = 'playing';
+      document.getElementById('msg').style.opacity = '0';
+    }
+    return;
+  }
 
   /* ==========================================
    * 操作处理
@@ -542,6 +555,7 @@ function update() {
 }
 
 let lastSafeX = 60, lastSafeY = GROUND_Y - CHAR_H - 10;
+let msgStayTimer = null;
 
 function die(fromFall) {
   if (gameState !== 'playing') return;
@@ -551,34 +565,58 @@ function die(fromFall) {
   document.getElementById('lives').textContent = lives;
 
   if (lives <= 0) {
+    // 生命耗尽：纯 JS 重置当前关卡（不 reload，避免 BGM/最高分被清）
+    showMsg('💀 生命耗尽！\n按 R 重新开始本关', false);
+    setTimeout(() => {
+      if (gameState === 'gameover') resetLevel();
+    }, 1200);
     gameState = 'gameover';
-    showMsg('💀 生命耗尽！游戏重新开始...', false);
-    setTimeout(() => location.reload(), 2000);
   } else {
-    // 原地复活 或 悬崖边复活
-    if (fromFall) {
-      player.x = lastSafeX;
-      player.y = lastSafeY;
-    } else {
-      player.y = lastSafeY;
-    }
+    // 进入 'dead' 状态：暂停 60 帧（约 1 秒），期间玩家无敌
+    // 此期间可以按 R 立即重置本关，否则自动复活继续
     player.vy = 0; player.vx = 0;
     player.jumpsUsed = 0;
     invincibleTimer = 120;
-    gameState = 'playing';
+    gameState = 'dead';
+    deadTimer = 60;
     document.getElementById('msg').style.opacity = '1';
-    document.getElementById('msg').innerHTML = '💔 -1';
-    setTimeout(() => { document.getElementById('msg').style.opacity = '0'; }, 800);
+    document.getElementById('msg').innerHTML = '💔 -1  ·  按 R 重置';
+    msgStayTimer = setTimeout(() => {
+      if (gameState === 'dead') document.getElementById('msg').style.opacity = '0';
+    }, 1000);
   }
 }
 
 function resetLevel() {
-  lives = 3; coinsCollected = 0; deaths = 0;
+  // 纯 JS 重置当前关卡（避免 location.reload 丢失 BGM/最高分）
+  const lv = LEVELS[currentLevel]; if (!lv) return;
+  document.getElementById('msg').style.opacity = '0';
+  GROUNDS = lv.grounds.map(o => ({...o, type:'ground'}));
+  PLATFORMS = lv.platforms.map(o => ({...o, type:'platform'}));
+  SPIKES = lv.spikes.map(o => ({...o}));
+  COINS = lv.coins.map(o => ({...o}));
+  MONSTERS = (lv.monsters || []).map(o => ({...o, alive:true, squashT:0, dir:-1, attackCD:180+Math.floor(Math.random()*80)}));
+  FLAG = {...lv.flag};
+  LEVEL_W = lv.width;
+  // 清掉残留子弹粒子（玩家 & 敌方）
+  particles = particles.filter(p => !p.isBullet && !p.isPlayerBullet);
+  // 重置玩家
   player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
-  player.vx = 0; player.vy = 0; player.jumpsUsed = 0;
+  player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
+  // 重置关卡统计
+  lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0; monsterKills = 0;
+  // 重置冲刺/无敌等瞬时状态
+  dashTimer = 0; dashCooldown = 0; dashDir = 0;
+  dashReadyL = 0; dashReadyR = 0;
+  djWindow = 0; p2JumpHeld = false;
+  invincibleTimer = 0; deadTimer = 0; winTimer = 0;
+  cameraX = 0;
+  lastSafeX = 60; lastSafeY = GROUND_Y - CHAR_H - 10;
+  if (msgStayTimer) { clearTimeout(msgStayTimer); msgStayTimer = null; }
+  // 清除 R 键状态，防止按住 R 反复触发
+  keys['KeyR'] = false;
   gameState = 'playing';
-  // 重置金币（简单重载）
-  location.reload();
+  showMsg('已重置本关');
 }
 
 /* ============================================
@@ -611,8 +649,6 @@ function draw() {
     // 标题
     ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
     ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
-    ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
-    ctx.fillText('P1: A/D移动+W二段跳  |  P2: ↑跳 ↓射击 ←→冲刺', CANVAS_W/2, topOffset+60);
     // 关卡列表
     const startY = topOffset + 90;
     for (let i=1; i<=totalLevels; i++) {
