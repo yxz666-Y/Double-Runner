@@ -417,9 +417,7 @@ function draw() {
     ctx.font = 'bold 18px -apple-system';
     for (let i=1; i<=Object.keys(LEVELS).length; i++) {
       ctx.fillStyle = i===menuSelection ? '#fd0' : '#888';
-      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name, CANVAS_W/2, 240+i*35);
-      ctx.fillStyle = '#666'; ctx.font = '12px -apple-system';
-      ctx.fillText(LEVELS[i].desc, CANVAS_W/2, 260+i*35);
+      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name, CANVAS_W/2, 260+i*40);
       ctx.font = 'bold 18px -apple-system';
     }
     ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px -apple-system';
