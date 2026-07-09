@@ -1072,7 +1072,7 @@ function draw() {
         if (!c) continue;
         ctx.fillStyle = c;
         const dx = flipX ? (CHAR_W - (sx+1)*PS) : sx*PS;
-        ctx.fillRect(px+dx, py-4+sy*PS, PS, PS);
+        ctx.fillRect(px+dx, py+4+sy*PS, PS, PS);
       }
     }
 
