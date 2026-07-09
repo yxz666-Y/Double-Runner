@@ -297,7 +297,7 @@ function update() {
   /* === P2: ↓ 射击 === */
   if (keys['ArrowDown'] && !keys._shotFired) {
     keys._shotFired = true;
-    const bulletDir = p.dir || 1;
+    const bulletDir = player.dir || 1;
     const bx = player.x + CHAR_W/2 + bulletDir*10;
     const by = player.y + CHAR_H/2;
     particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true, isBullet:true});
