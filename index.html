@@ -456,24 +456,28 @@ function draw() {
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
     ctx.textAlign = 'center';
+    // 计算总高度，居中分布
+    const rowH = 38, listW = 400;
+    const totalH = 70 + 20 + rowH*totalLevels + 30; // 标题+间距+列表+底部
+    const topOffset = (CANVAS_H - totalH) / 2;
     // 标题
     ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
-    ctx.fillText('双人跑酷', CANVAS_W/2, 80);
+    ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
     ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
-    ctx.fillText('P1: A/D 移动  ·  W 二段跳  |  P2: ↑ 跳跃  ·  ↓ 快落  ·  ←→ 冲刺', CANVAS_W/2, 108);
+    ctx.fillText('P1: A/D 移动 + W 二段跳  |  P2: ↑↓←→ 跳跃/冲刺', CANVAS_W/2, topOffset+60);
     // 关卡列表
-    const startY = 150, rowH = 36, listW = 380;
+    const startY = topOffset + 90;
     for (let i=1; i<=totalLevels; i++) {
       const y = startY + (i-1)*rowH;
       const sel = i===menuSelection;
-      if (sel) { ctx.fillStyle = 'rgba(255,200,0,0.12)'; ctx.fillRect(CANVAS_W/2-listW/2, y-14, listW, 28); }
+      if (sel) { ctx.fillStyle = 'rgba(255,200,0,0.12)'; ctx.fillRect(CANVAS_W/2-listW/2, y-15, listW, 30); }
       ctx.font = sel?'bold 16px -apple-system':'14px -apple-system';
       ctx.fillStyle = sel?'#fd0':'#aaa';
       const hs = highScores[i]||0;
       ctx.fillText((sel?'▶ ':'  ')+'第'+i+'关  '+LEVELS[i].name+(hs?'  最高'+hs:'  无记录'), CANVAS_W/2, y);
     }
     ctx.font = '13px -apple-system'; ctx.fillStyle = '#ff0';
-    ctx.fillText('↑↓ 选择  ·  Enter 进入  ·  数字键 1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+24);
+    ctx.fillText('↑↓ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+30);
     ctx.textAlign = 'left'; return;
   }
 
