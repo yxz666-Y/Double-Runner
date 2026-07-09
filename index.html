@@ -1023,107 +1023,61 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
-  /* ---- 角色 ---- */
+  /* ---- 角色（像素精绘） ---- */
   const showChar = gameState !== 'gameover';
-  if (invincibleTimer > 0) {
-    ctx.globalAlpha = 0.4 + Math.sin(invincibleTimer * 0.5) * 0.2;
-  }
+  if (invincibleTimer > 0) ctx.globalAlpha = 0.4 + Math.sin(invincibleTimer * 0.5) * 0.2;
   if (showChar) {
-    const p = player;
-    // 方向：根据vx或冲刺方向
+    const p = player, px=p.x, py=p.y, inAir=!p.onGround;
     const dir = dashTimer>0 ? dashDir : (p.vx!==0 ? (p.vx>0?1:-1) : (p.dir||1));
-    p.dir = dir;
-    const flipX = dir < 0;
-    function d(x,y,w,h){ // 像素矩形（支持翻转）
-      const sx = flipX ? p.x+CHAR_W-(x-p.x)-w : x;
-      ctx.fillRect(sx, y, w, h);
+    p.dir = dir; const flipX = dir < 0;
+    const PS = 2; // 每像素2px
+
+    // 冲刺冷却条
+    if (dashCooldown > 0) {
+      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(px,py-10,CHAR_W,4);
+      ctx.fillStyle='#fff'; ctx.fillRect(px,py-10,CHAR_W*(1-dashCooldown/DASH_COOLDOWN),4);
+    } else if (dashTimer <= 0) {
+      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(px,py-10,CHAR_W,4);
+      ctx.fillStyle='#fb5'; ctx.fillRect(px,py-10,CHAR_W,4);
     }
-    const px=p.x, py=p.y;
-    const inAir = !p.onGround;
+
+    // 调色板: 0透明 1帽红 2帽暗 3肤色 4肤暗 5眼白 6瞳 7棕
+    //         8衣红 9衣暗 A裤蓝 B裤亮 C鞋棕 D鞋暗 E金 F白
+    const C = [null,'#e83030','#b02020','#ffe8c0','#e8c8a0','#fff','#111','#6b4020',
+               '#e83030','#c02020','#3058d8','#5080f0','#5b3020','#3a1a10','#fd0','#fff'];
+    // 精灵 [15行×14列]
+    const spStand = [
+      '00011111111100','00111111111110','01122222222211','01110000000111',
+      '11105333335011','11153666335011','11113636335011','11113333330111',
+      '11117777770111','01888888888810','01999999999910','01AABBBBAABB10',
+      '01AABBBBAABB10','01CCDDDDCCDD10','001CDDDDDDD100',
+    ];
+    const spAir = [
+      '00011111111100','00111111111110','01122222222211','03530000000353',
+      '11133666330111','11153636350111','11113333330111','11117777770111',
+      '01888888888810','01999999999910','01AABBBBAABB10','01AA0BB0AABB10',
+      '00CCDDDDCCDD00','000DDDDDDDD000',
+    ];
+    const sprite = inAir ? spAir : spStand;
 
     // 阴影
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(px+4, py+CHAR_H-2, 20, 4);
+    ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(px+4,py+CHAR_H-2,20,4);
 
-    // 冲刺冷却进度条（帽子正上方）
-    if (dashCooldown > 0) {
-      // 冷却中：白色，长度随剩余时间增长（0→满）
-      const remain = dashCooldown / DASH_COOLDOWN;     // 1=刚开始 0=刚结束
-      const fillW = CHAR_W * (1 - remain);              // 从 0 增长到 CHAR_W
-      // 背景槽
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(px, py-10, CHAR_W, 4);
-      // 白色填充
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(px, py-10, fillW, 4);
-    } else if (dashTimer <= 0) {
-      // 冷却完成且当前未在冲刺：满长橙色
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(px, py-10, CHAR_W, 4);
-      ctx.fillStyle = '#fb5';
-      ctx.fillRect(px, py-10, CHAR_W, 4);
-    }
-    // 冲刺中（dashTimer > 0）：不画进度条
-
-    // 帽子（红色）
-    ctx.fillStyle = dashTimer>0?'#ff8888':'#e83030';
-    d(px+4, py-3, 20, 8);
-    d(px+2, py+2, 26, 5);
-
-    // 脸
-    ctx.fillStyle = '#ffe8c0';
-    d(px+4, py+5, 20, 12);
-
-    // 眼睛（面朝方向）
-    ctx.fillStyle = '#000';
-    if (dir>0) { ctx.fillRect(px+18, py+8, 4, 4); }
-    else { ctx.fillRect(px+6, py+8, 4, 4); }
-
-    // 胡子
-    ctx.fillStyle = '#8b5a2b';
-    d(px+4, py+14, 8, 4); d(px+16, py+14, 8, 4);
-
-    // 身体（红色衬衫）
-    ctx.fillStyle = '#e83030';
-    d(px+4, py+17, 20, 6);
-
-    // 跳跃姿势：手臂上举
-    if (inAir) {
-      ctx.fillStyle = '#ffe8c0';
-      d(px+2, py+12, 6, 8); d(px+20, py+12, 6, 8); // 手臂
-      // 腿分开
-      ctx.fillStyle = '#3858e8';
-      d(px+2, py+29, 8, 6); d(px+18, py+29, 8, 6);
-      ctx.fillStyle = '#6b3020';
-      d(px, py+34, 10, 4); d(px+18, py+34, 10, 4);
-    } else {
-      // 站立/行走：手臂自然下垂
-      ctx.fillStyle = '#ffe8c0';
-      d(px+4, py+16, 5, 6); d(px+19, py+16, 5, 6);
-      // 腿
-      ctx.fillStyle = '#3858e8';
-      d(px+4, py+29, 8, 6); d(px+16, py+29, 8, 6);
-      ctx.fillStyle = '#6b3020';
-      d(px+2, py+34, 10, 4); d(px+16, py+34, 10, 4);
-    }
-
-    // 蓝色背带裤
-    ctx.fillStyle = '#3858e8';
-    d(px+4, py+23, 20, 6);
-    ctx.fillStyle = '#3858e8';
-    d(px+6, py+17, 4, 12); d(px+18, py+17, 4, 12);
-
-    // 冲刺速度线
-    if (dashTimer > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      for (let i=0; i<3; i++) {
-        ctx.fillRect(flipX?px-10:px+CHAR_W, py+14+i*8, 10, 3);
+    // 绘制像素
+    for (let sy=0; sy<sprite.length; sy++) {
+      for (let sx=0; sx<sprite[sy].length; sx++) {
+        const ci = sprite[sy][sx], c = C[parseInt(ci,16)];
+        if (!c) continue;
+        ctx.fillStyle = c;
+        const dx = flipX ? (CHAR_W - (sx+1)*PS) : sx*PS;
+        ctx.fillRect(px+dx, py-4+sy*PS, PS, PS);
       }
     }
-    if (!p.onGround && p.jumpsUsed >= 1) {
-      ctx.fillStyle = 'rgba(100,180,255,0.25)';
-      ctx.beginPath(); ctx.arc(p.x+CHAR_W/2, p.y+CHAR_H, 20, 0, Math.PI*2); ctx.fill();
-    }
+
+    // 冲刺速度线
+    if (dashTimer>0){ctx.fillStyle='rgba(255,255,255,0.6)';for(let i=0;i<3;i++)ctx.fillRect(flipX?px-10:px+CHAR_W,py+14+i*8,10,3)}
+    // 跳跃光圈
+    if (!p.onGround&&p.jumpsUsed>=1){ctx.fillStyle='rgba(100,180,255,0.25)';ctx.beginPath();ctx.arc(p.x+CHAR_W/2,p.y+CHAR_H,20,0,Math.PI*2);ctx.fill()}
   }
   ctx.globalAlpha = 1;
 
