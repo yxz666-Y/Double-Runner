@@ -100,6 +100,7 @@ let menuSelection = 1; // 菜单当前选中的关卡
 
 function loadLevel(id) {
   const lv = LEVELS[id]; if (!lv) return;
+  document.getElementById('msg').style.opacity = '0'; // 清除旧消息
   GROUNDS = lv.grounds.map(o => ({...o, type:'ground'}));
   PLATFORMS = lv.platforms.map(o => ({...o, type:'platform'}));
   SPIKES = lv.spikes.map(o => ({...o}));
