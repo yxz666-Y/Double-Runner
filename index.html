@@ -20,6 +20,7 @@ canvas{display:block;border:1px solid #333}
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
+  <span id="level-tag" style="color:#fd0">第 1 关</span>
 </div>
 <canvas id="game"></canvas>
 <div id="msg"></div>
@@ -28,7 +29,6 @@ canvas{display:block;border:1px solid #333}
  * 常量 —— 调参区
  * ============================================ */
 const CANVAS_W = 800, CANVAS_H = 500;       // 画布
-const LEVEL_W = 1500;                        // 关卡总长
 const GRAVITY      = 0.55;   // 重力加速度（px/frame²）
 const JUMP_V       = -9.0;   // 一段跳初速度
 const DOUBLE_JUMP_V= -7.5;   // 二段跳初速度
@@ -70,42 +70,50 @@ let djWindow = 0;            // 二段跳时间窗剩余帧数（P2跳跃后开�
 let p2JumpHeld = false;      // P2是否正在按住跳跃键（防连跳）
 
 /* ============================================
- * 关卡数据 {x,y,w,h,type}
- * type: 'ground' | 'platform' | 'spike' | 'coin' | 'flag'
+ * 关卡数据 —— 多关卡并存
  * ============================================ */
-const GROUNDS = [
-  {x:0,   y:GROUND_Y, w:300, h:70, type:'ground'},
-  {x:380, y:GROUND_Y, w:120, h:70, type:'ground'},
-  {x:580, y:GROUND_Y, w:200, h:70, type:'ground'},
-  {x:900, y:GROUND_Y, w:600, h:70, type:'ground'},
-];
+const LEVELS = {
+  1: {
+    name: '第一关 · 教学', width: 1500,
+    grounds: [{x:0,y:GROUND_Y,w:600,h:70},{x:760,y:GROUND_Y,w:740,h:70}],
+    platforms: [{x:620,y:380,w:160,h:16}],
+    spikes: [{x:400,y:GROUND_Y-20,w:40,h:20}],
+    coins: [{x:200,y:380},{x:230,y:380},{x:680,y:360},{x:710,y:360},{x:900,y:380},{x:930,y:380}],
+    flag: {x:1420,y:GROUND_Y-80,w:10,h:80},
+  },
+  2: {
+    name: '第二关 · 挑战', width: 2200,
+    grounds: [{x:0,y:GROUND_Y,w:700,h:70},{x:820,y:GROUND_Y,w:480,h:70},{x:1500,y:GROUND_Y,w:400,h:70},{x:1980,y:GROUND_Y,w:220,h:70}],
+    platforms: [{x:700,y:380,w:140,h:16},{x:920,y:360,w:100,h:16},{x:1050,y:290,w:80,h:16},{x:1380,y:360,w:80,h:16},{x:1700,y:380,w:100,h:16}],
+    spikes: [{x:400,y:GROUND_Y-20,w:40,h:20},{x:1750,y:GROUND_Y-20,w:40,h:20}],
+    coins: [{x:200,y:380},{x:230,y:380},{x:740,y:360},{x:770,y:360},{x:950,y:330},{x:980,y:330},{x:1070,y:270},{x:1090,y:270},{x:1400,y:340},{x:1420,y:340},{x:1620,y:380},{x:1650,y:380},{x:1730,y:360},{x:2020,y:380},{x:2050,y:380},{x:2080,y:380}],
+    flag: {x:2120,y:GROUND_Y-80,w:10,h:80},
+  },
+};
 
-const PLATFORMS = [
-  {x:310, y:380, w:100, h:16, type:'platform'},
-  {x:500, y:340, w:110, h:16, type:'platform'},
-  {x:430, y:270, w:90,  h:16, type:'platform'},
-  {x:650, y:350, w:100, h:16, type:'platform'},
-  {x:800, y:300, w:100, h:16, type:'platform'},
-  {x:1050,y:370, w:120, h:16, type:'platform'},
-  {x:1200,y:320, w:100, h:16, type:'platform'},
-];
+// 运行时关卡数据（由 loadLevel 填充）
+let LEVEL_W = 1500;
+let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
+let FLAG = {x:0,y:0,w:0,h:0};
+let currentLevel = 1;
+let menuSelection = 1; // 菜单当前选中的关卡
 
-const SPIKES = [
-  {x:150, y:GROUND_Y-20, w:60, h:20},
-  {x:420, y:GROUND_Y-20, w:80, h:20},
-  {x:950, y:GROUND_Y-20, w:80, h:20},
-];
-
-const COINS = [
-  {x:200,y:380},{x:230,y:380},{x:260,y:380},
-  {x:440,y:300},{x:470,y:300},{x:500,y:300},
-  {x:620,y:310},{x:650,y:310},
-  {x:850,y:260},{x:880,y:260},
-  {x:1080,y:280},{x:1120,y:280},{x:1160,y:280},
-  {x:1350,y:370},{x:1380,y:370},
-];
-
-const FLAG = {x:1420, y:GROUND_Y-80, w:10, h:80};
+function loadLevel(id) {
+  const lv = LEVELS[id]; if (!lv) return;
+  GROUNDS = lv.grounds.map(o => ({...o, type:'ground'}));
+  PLATFORMS = lv.platforms.map(o => ({...o, type:'platform'}));
+  SPIKES = lv.spikes.map(o => ({...o}));
+  COINS = lv.coins.map(o => ({...o}));
+  FLAG = {...lv.flag};
+  LEVEL_W = lv.width;
+  currentLevel = id;
+  const tag = document.getElementById('level-tag');
+  if (tag) tag.textContent = '第 ' + id + ' 关';
+  player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
+  player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
+  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0;
+  gameState = 'playing';
+}
 
 /* ============================================
  * 输入
@@ -114,6 +122,20 @@ const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
   e.preventDefault();
+  // 菜单控制：数字键或方向键选关
+  if (gameState === 'menu') {
+    if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); return; }
+    if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); return; }
+    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { menuSelection = menuSelection===1?2:1; return; }
+    if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); return; }
+  }
+  // 胜利菜单控制
+  if (gameState === 'win') {
+    if (e.code === 'Enter' || e.code === 'Space') {
+      if (currentLevel < Object.keys(LEVELS).length) { loadLevel(currentLevel+1); return; }
+    }
+    if (e.code === 'Backspace') { gameState = 'menu'; return; }
+  }
   if (e.code === 'KeyR' && (gameState === 'dead' || gameState === 'gameover')) resetLevel();
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; e.preventDefault(); });
@@ -148,7 +170,7 @@ function update() {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
     return;
   }
-  if (gameState === 'win') { winTimer++; if (winTimer>180) location.reload(); return; }
+  if (gameState === 'win') { winTimer++; if (winTimer>300) gameState='menu'; return; }
   if (gameState === 'gameover') return;
 
   /* ==========================================
@@ -300,7 +322,8 @@ function update() {
   if (rectCollide(player, FLAG)) {
     gameState = 'win';
     winTimer = 0;
-    showMsg('🎉 完美配合！\n通关成功！', false);
+    const hasNext = currentLevel < Object.keys(LEVELS).length;
+    showMsg('🎉 通关！\n'+(hasNext?'按 Enter 进入下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
   }
 
   /* ---- 相机 ---- */
@@ -369,26 +392,34 @@ function draw() {
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
     ctx.fillStyle = '#fd0'; ctx.font = 'bold 40px -apple-system';
     ctx.textAlign = 'center';
-    ctx.fillText('🎉 完美配合！', CANVAS_W/2, 200);
-    ctx.fillText('通关成功！', CANVAS_W/2, 250);
+    ctx.fillText('🎉 完美配合！', CANVAS_W/2, 180);
+    ctx.fillText('通关成功！', CANVAS_W/2, 230);
     ctx.fillStyle = '#fff'; ctx.font = '16px -apple-system';
-    ctx.fillText('3秒后返回主菜单', CANVAS_W/2, 300);
+    const hasNext = currentLevel < Object.keys(LEVELS).length;
+    ctx.fillText(hasNext ? 'Enter 下一关  ·  Backspace 回菜单' : 'Backspace 回菜单', CANVAS_W/2, 290);
+    ctx.fillText('或等待5秒自动返回', CANVAS_W/2, 320);
     ctx.textAlign = 'left';
     return;
   }
-  // 开始画面
+  // 开始菜单（含选关）
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
-    ctx.textAlign = 'center';
-    ctx.fillText('双人跑酷', CANVAS_W/2, 180);
-    ctx.font = '16px -apple-system'; ctx.fillStyle = '#aaa';
-    ctx.fillText('P1: A/D 移动 | P2: ↑ 跳跃', CANVAS_W/2, 230);
-    ctx.fillText('P1+2: 冲刺 & 二段跳', CANVAS_W/2, 255);
-    ctx.fillStyle = '#ff0'; ctx.font = 'bold 22px -apple-system';
-    ctx.fillText('按 ENTER 开始游戏', CANVAS_W/2, 320);
-    ctx.textAlign = 'left';
-    return;
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system'; ctx.textAlign = 'center';
+    ctx.fillText('双人跑酷', CANVAS_W/2, 130);
+    ctx.font = '14px -apple-system'; ctx.fillStyle = '#aaa';
+    ctx.fillText('P1: A/D 移动 | P2: ↑ 跳跃  |  P1+2: 冲刺 & 二段跳', CANVAS_W/2, 180);
+    // 关卡选择
+    ctx.font = 'bold 18px -apple-system';
+    for (let i=1; i<=Object.keys(LEVELS).length; i++) {
+      ctx.fillStyle = i===menuSelection ? '#fd0' : '#888';
+      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name, CANVAS_W/2, 240+i*35);
+      ctx.fillStyle = '#666'; ctx.font = '12px -apple-system';
+      ctx.fillText(LEVELS[i].desc, CANVAS_W/2, 260+i*35);
+      ctx.font = 'bold 18px -apple-system';
+    }
+    ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px -apple-system';
+    ctx.fillText('↑↓ 切换  ·  Enter 进入  ·  1/2 快速选关', CANVAS_W/2, 370);
+    ctx.textAlign = 'left'; return;
   }
 
   ctx.save();
