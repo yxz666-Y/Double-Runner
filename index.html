@@ -597,11 +597,6 @@ function draw() {
         ctx.fillRect(flipX?px-10:px+CHAR_W, py+14+i*8, 10, 3);
       }
     }
-    // 空中跳跃特效
-    if (!p.onGround && p.jumpsUsed >= 2) {
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.beginPath(); ctx.arc(p.x+CHAR_W/2, p.y+CHAR_H/2, CHAR_W*0.9, 0, Math.PI*2); ctx.fill();
-    }
     if (!p.onGround && p.jumpsUsed >= 1) {
       ctx.fillStyle = 'rgba(100,180,255,0.25)';
       ctx.beginPath(); ctx.arc(p.x+CHAR_W/2, p.y+CHAR_H, 20, 0, Math.PI*2); ctx.fill();
