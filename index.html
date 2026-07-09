@@ -427,13 +427,6 @@ function draw() {
 
   ctx.restore();
 
-  /* ---- HUD 状态 ---- */
-  ctx.fillStyle = '#fff'; ctx.font = '13px -apple-system';
-  const djReady = djWindow > 0 && !player.onGround && player.jumpsUsed < player.maxJumps;
-  ctx.fillText('二段跳: ' + (djReady ? '⏳就绪' : '—'), CANVAS_W-140, 24);
-  ctx.fillText('冲刺: ' + (dashCooldown > 0 ? '冷却' + Math.ceil(dashCooldown/60) + 's' : '✅'), CANVAS_W-140, 44);
-  ctx.fillText('无敌: ' + (invincibleTimer > 0 ? Math.ceil(invincibleTimer/60) + 's' : '—'), CANVAS_W-140, 64);
-
 }
 
 /* ============================================
