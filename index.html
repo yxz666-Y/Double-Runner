@@ -30,20 +30,20 @@ canvas{display:block;border:1px solid #333}
  * 常量 —— 调参区
  * ============================================ */
 const CANVAS_W = 800, CANVAS_H = 500;       // 画布
-const GRAVITY      = 0.55;   // 重力加速度（px/frame²）
+const GRAVITY      = 0.55;   // 重力加速度
 const JUMP_V       = -9.0;   // 一段跳初速度
 const DOUBLE_JUMP_V= -7.5;   // 二段跳初速度
-const MOVE_SPEED   = 3.5;    // 水平移速（px/frame）
+const MOVE_SPEED   = 3.5;    // 水平移速
 const DASH_SPEED   = 9;      // 冲刺速度
 const DASH_DURATION= 8;      // 冲刺持续帧数
 const DASH_COOLDOWN= 60;     // 冲刺冷却帧数
-const DJ_WINDOW    = 30;     // 二段跳时间窗（帧数，约500ms@60fps）
-const DASH_WINDOW  = 15;     // 冲刺就绪窗（P1按A/D后P2有15帧时间按箭头）
+const DJ_WINDOW    = 30;     // 二段跳时间窗
+const DASH_WINDOW  = 15;     // 冲刺就绪窗
 const GROUND_Y     = 430;    // 地面 y 坐标
 const CHAR_W = 28, CHAR_H = 38; // 角色尺寸
 const MONSTER_W = 32, MONSTER_H = 28;        // 怪兽尺寸
 const ENEMY_BULLET_SPEED = 4.0;              // 怪兽弹幕速度
-const MONSTER_DMG = 1;                       // 怪兽碰撞伤害（扣心数）
+const MONSTER_DMG = 1;                       // 怪兽碰撞伤害
 const BULLET_SPEED = 8;                      // 玩家子弹速度
 
 /* ============================================
@@ -293,7 +293,7 @@ function update() {
     player.vy = JUMP_V;
     player.onGround = false;
     player.jumpsUsed = 1;
-    djWindow = DJ_WINDOW;  // 开启二段跳时间窗
+    djWindow = DJ_WINDOW;
     p2JumpHeld = true;
     sfxJump();
     spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#5bf', 10);
@@ -853,12 +853,15 @@ function showMsg(text, autoHide=true) {
 /* ============================================
  * 循环
  * ============================================ */
-function loop() {
-  update();
-  draw();
+let lastFrame = 0;
+function loop(ts) {
+  if (ts - lastFrame >= 16) {  // 锁定60fps，高刷屏不加速
+    lastFrame = ts;
+    update(); draw();
+  }
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
