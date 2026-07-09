@@ -96,7 +96,9 @@ let LEVEL_W = 1500;
 let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
 let FLAG = {x:0,y:0,w:0,h:0};
 let currentLevel = 1;
-let menuSelection = 1; // 菜单当前选中的关卡
+let menuSelection = 1;
+let levelTimer = 0;      // 关卡用时（帧数）
+let finalScore = 0;      // 通关得分
 
 function loadLevel(id) {
   const lv = LEVELS[id]; if (!lv) return;
@@ -112,7 +114,7 @@ function loadLevel(id) {
   if (tag) tag.textContent = '第 ' + id + ' 关';
   player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
   player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
-  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0;
+  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0;
   gameState = 'playing';
 }
 
@@ -167,6 +169,7 @@ function spawnParticles(x, y, color, count) {
  * 更新
  * ============================================ */
 function update() {
+  if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
     return;
@@ -327,8 +330,15 @@ function update() {
   if (rectCollide(player, FLAG)) {
     gameState = 'win';
     winTimer = 0;
+    const seconds = Math.floor(levelTimer / 60);
+    const timeBonus = Math.max(0, 500 - seconds * 5);
+    const coinBonus = coinsCollected * 50;
+    const deathPenalty = deaths * 200;
+    finalScore = 1000 + timeBonus + coinBonus - deathPenalty;
+    if (finalScore < 0) finalScore = 0;
     const hasNext = currentLevel < Object.keys(LEVELS).length;
-    showMsg('🎉 通关！\n'+(hasNext?'按 Enter 进入下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
+    showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  💀 '+deaths+
+      '\n'+(hasNext?'Enter 下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
   }
 
   /* ---- 相机 ---- */
