@@ -428,50 +428,86 @@ function draw() {
   ctx.save();
   ctx.translate(-cameraX, 0);
 
-  /* ---- 天空渐变 ---- */
-  const skyGrad = ctx.createLinearGradient(0,0,0,CANVAS_H);
-  skyGrad.addColorStop(0,'#4a90d9'); skyGrad.addColorStop(0.6,'#87ceeb'); skyGrad.addColorStop(1,'#c8e6c0');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(cameraX, 0, CANVAS_W, CANVAS_H);
-
-  /* ---- 远山 ---- */
-  ctx.fillStyle = '#8bb87a';
-  for (let x=cameraX-20; x<cameraX+CANVAS_W+40; x+=120) {
-    ctx.beginPath(); ctx.moveTo(x-40,GROUND_Y); ctx.lineTo(x+20,GROUND_Y-50); ctx.lineTo(x+80,GROUND_Y); ctx.fill();
+  /* ---- 天空 ---- */
+  ctx.fillStyle = '#5c94fc'; ctx.fillRect(cameraX, 0, CANVAS_W, CANVAS_H);
+  // 像素云
+  ctx.fillStyle = '#ffffff';
+  for (let cx = (cameraX-cameraX%200)-100; cx < cameraX+CANVAS_W+200; cx += 200) {
+    const cy = 40 + ((cx*7)%60);
+    ctx.fillRect(cx,cy,40,16); ctx.fillRect(cx+12,cy-10,56,20); ctx.fillRect(cx+24,cy-16,32,16);
+    ctx.fillRect(cx+44,cy-6,28,14);
+  }
+  // 远山
+  for (let hx = (cameraX-cameraX%160)-80; hx < cameraX+CANVAS_W+160; hx += 160) {
+    ctx.fillStyle = '#68b838';
+    ctx.beginPath(); ctx.moveTo(hx-30,GROUND_Y); ctx.lineTo(hx+20,GROUND_Y-60); ctx.lineTo(hx+80,GROUND_Y); ctx.fill();
+    ctx.fillStyle = '#58a828';
+    ctx.beginPath(); ctx.moveTo(hx+10,GROUND_Y); ctx.lineTo(hx+50,GROUND_Y-40); ctx.lineTo(hx+70,GROUND_Y); ctx.fill();
   }
 
-  /* ---- 地面 ---- */
+  /* ---- 地面（像素砖块） ---- */
+  const brkColors = ['#c84c30','#b84028','#a83820'];
   for (const g of GROUNDS) {
-    ctx.fillStyle = '#6b8e23'; ctx.fillRect(g.x, g.y, g.w, g.h);
-    ctx.fillStyle = '#556b2f'; ctx.fillRect(g.x, g.y, g.w, 8);
+    // 泥土
+    ctx.fillStyle = '#c84c30'; ctx.fillRect(g.x, g.y, g.w, g.h);
+    // 砖块纹理
+    for (let bx=g.x; bx<g.x+g.w; bx+=32) {
+      for (let by=g.y; by<g.y+g.h; by+=16) {
+        const ci = ((bx/32)+(by/16))%3;
+        ctx.fillStyle = brkColors[ci];
+        ctx.fillRect(bx, by, 31, 15);
+        ctx.fillStyle = '#d46040'; ctx.fillRect(bx, by, 31, 3);
+        ctx.fillStyle = '#903020'; ctx.fillRect(bx, by+12, 31, 3);
+      }
+    }
+    // 草地顶部
+    ctx.fillStyle = '#38b838'; ctx.fillRect(g.x, g.y, g.w, 10);
+    ctx.fillStyle = '#48d848'; ctx.fillRect(g.x, g.y, g.w, 4);
+    // 草地纹理
+    for (let gx=g.x; gx<g.x+g.w; gx+=8) {
+      ctx.fillStyle = (Math.floor(gx/8)%2)?'#48d040':'#38b030';
+      ctx.fillRect(gx+1, g.y+6, 6, 2);
+    }
   }
 
-  /* ---- 平台 ---- */
+  /* ---- 平台（像素砖块） ---- */
   for (const p of PLATFORMS) {
-    ctx.fillStyle = '#a0522d'; ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = '#8b4513'; ctx.fillRect(p.x, p.y, p.w, 4);
-    ctx.fillStyle = '#cd853f'; ctx.fillRect(p.x, p.y+4, p.w, 4);
+    for (let bx=p.x; bx<p.x+p.w; bx+=16) {
+      ctx.fillStyle = (Math.floor(bx/16)%2)?'#c84c30':'#d86040';
+      ctx.fillRect(bx, p.y, 15, p.h);
+      ctx.fillStyle = '#e87850'; ctx.fillRect(bx, p.y, 15, 3);
+      ctx.fillStyle = '#903020'; ctx.fillRect(bx, p.y+p.h-3, 15, 3);
+      // 砖缝
+      ctx.fillStyle = '#1a0808'; ctx.fillRect(bx-1, p.y, 1, p.h); ctx.fillRect(bx-1, p.y+p.h/2, 15, 1);
+    }
   }
 
   /* ---- 尖刺 ---- */
   for (const s of SPIKES) {
-    ctx.fillStyle = '#e44';
-    for (let sx = s.x; sx < s.x+s.w; sx += 16) {
-      ctx.beginPath(); ctx.moveTo(sx, s.y+s.h); ctx.lineTo(sx+8, s.y); ctx.lineTo(sx+16, s.y+s.h); ctx.fill();
+    for (let sx = s.x; sx < s.x+s.w; sx += 12) {
+      ctx.fillStyle = '#e83030';
+      ctx.beginPath(); ctx.moveTo(sx, s.y+s.h); ctx.lineTo(sx+6, s.y); ctx.lineTo(sx+12, s.y+s.h); ctx.fill();
+      ctx.fillStyle = '#ff5050';
+      ctx.beginPath(); ctx.moveTo(sx+2, s.y+s.h); ctx.lineTo(sx+6, s.y+2); ctx.lineTo(sx+10, s.y+s.h); ctx.fill();
     }
   }
 
   /* ---- 金币 ---- */
   for (const c of COINS) {
     const bob = Math.sin(Date.now()/300 + c.x) * 2;
-    ctx.fillStyle = '#fd0'; ctx.beginPath(); ctx.arc(c.x, c.y+bob, 7, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#ff8'; ctx.beginPath(); ctx.arc(c.x-2, c.y-1+bob, 3, 0, Math.PI*2); ctx.fill();
+    const w = Math.abs(Math.cos(Date.now()/400 + c.x)) * 10 + 4; // 旋转宽度变化
+    const cx = c.x, cy = c.y + bob;
+    ctx.fillStyle = '#fd0'; ctx.fillRect(cx-w/2, cy-5, w, 10);
+    ctx.fillStyle = '#ff8'; ctx.fillRect(cx-w/2+2, cy-3, w-4, 6);
+    ctx.fillStyle = '#fd0'; ctx.fillRect(cx-3, cy-3, 6, 6); ctx.fillStyle = '#ff8'; ctx.fillRect(cx-2, cy-2, 4, 4);
   }
 
-  /* ---- 终点旗帜 ---- */
-  ctx.fillStyle = '#ffd700'; ctx.fillRect(FLAG.x, FLAG.y+Math.sin(Date.now()/400)*4, FLAG.w, FLAG.h);
-  ctx.fillStyle = '#fff'; ctx.fillRect(FLAG.x+2, FLAG.y+4, FLAG.w-4, 12);
-  ctx.fillStyle = '#f00'; ctx.fillRect(FLAG.x+2, FLAG.y+16, FLAG.w-4, 12);
+  /* ---- 终点旗杆 ---- */
+  const flagWave = Math.sin(Date.now()/400)*4;
+  ctx.fillStyle = '#888'; ctx.fillRect(FLAG.x+4, FLAG.y, 4, FLAG.h);
+  ctx.fillStyle = '#48c848'; ctx.fillRect(FLAG.x-2, FLAG.y+4+flagWave, 32, 18);
+  ctx.fillStyle = '#fff'; ctx.fillRect(FLAG.x+2, FLAG.y+8+flagWave, 16, 8);
+  ctx.fillStyle = '#fd0'; ctx.beginPath(); ctx.arc(FLAG.x+6, FLAG.y, 8, 0, Math.PI*2); ctx.fill();
 
   /* ---- 冲刺残影 ---- */
   if (dashTimer > 0) {
@@ -492,25 +528,31 @@ function draw() {
   if (showChar) {
     const p = player;
     // 阴影
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+2, p.y+CHAR_H-2, CHAR_W-4, 4);
-    // 身体
-    const bodyColor = dashTimer > 0 ? '#8cf' : '#5b9ee0';
-    const bodyGrad = ctx.createLinearGradient(p.x, p.y, p.x+CHAR_W, p.y);
-    bodyGrad.addColorStop(0, bodyColor); bodyGrad.addColorStop(1, dashTimer > 0 ? '#6af' : '#3b7ec0');
-    ctx.fillStyle = bodyGrad; ctx.fillRect(p.x+2, p.y+10, CHAR_W-4, CHAR_H-12);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+4, p.y+CHAR_H-2, 20, 4);
+    // 帽子（红色）
+    ctx.fillStyle = dashTimer>0?'#ff8888':'#e83030';
+    ctx.fillRect(p.x+4, p.y-3, 20, 8);
+    ctx.fillRect(p.x+2, p.y+2, 26, 5);
+    // 脸
+    ctx.fillStyle = '#ffe8c0'; ctx.fillRect(p.x+4, p.y+5, 20, 12);
+    // 眼睛
+    ctx.fillStyle = '#000'; ctx.fillRect(p.x+18, p.y+8, 4, 4);
+    // 胡子（棕色）
+    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.x+2, p.y+14, 8, 4); ctx.fillRect(p.x+18, p.y+14, 8, 4);
+    // 身体（红色衬衫 + 蓝色背带裤）
+    ctx.fillStyle = '#e83030'; ctx.fillRect(p.x+4, p.y+17, 20, 6);
+    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+4, p.y+23, 20, 6);
+    // 背带
+    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+6, p.y+17, 4, 12); ctx.fillRect(p.x+18, p.y+17, 4, 12);
+    // 腿
+    ctx.fillStyle = '#3858e8'; ctx.fillRect(p.x+4, p.y+29, 8, 6); ctx.fillRect(p.x+16, p.y+29, 8, 6);
+    // 鞋
+    ctx.fillStyle = '#6b3020'; ctx.fillRect(p.x+2, p.y+34, 10, 4); ctx.fillRect(p.x+16, p.y+34, 10, 4);
     // 冲刺速度线
     if (dashTimer > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      for (let i=0; i<3; i++) ctx.fillRect(p.x+CHAR_W, p.y+14+i*8, 12, 2);
+      for (let i=0; i<3; i++) ctx.fillRect(p.x+CHAR_W, p.y+14+i*8, 10, 3);
     }
-    // 头
-    ctx.fillStyle = '#ffe4c8'; ctx.fillRect(p.x+4, p.y, CHAR_W-8, 14);
-    // 帽子
-    ctx.fillStyle = '#e44'; ctx.fillRect(p.x+2, p.y-2, CHAR_W-4, 6);
-    // 眼睛
-    ctx.fillStyle = '#000'; ctx.fillRect(p.x+CHAR_W-12, p.y+4, 3, 3);
-    // 腿
-    ctx.fillStyle = '#334'; ctx.fillRect(p.x+4, p.y+CHAR_H-8, 8, 8); ctx.fillRect(p.x+CHAR_W-12, p.y+CHAR_H-8, 8, 8);
     // 空中跳跃特效
     if (!p.onGround && p.jumpsUsed >= 2) {
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
