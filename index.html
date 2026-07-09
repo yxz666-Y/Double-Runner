@@ -15,7 +15,7 @@ canvas{display:block;border:1px solid #333}
 </head>
 <body>
 <div id="hud">
-  <span id="p1">P1: A/D 移动 | W 二段跳</span>
+  <span id="p1">P1: A/D 移动 | W 二段跳 | J 射击</span>
   <span id="p2">P2: ↑ 跳 | ↓ 下落 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
@@ -44,6 +44,7 @@ const CHAR_W = 28, CHAR_H = 38; // 角色尺寸
 const MONSTER_W = 32, MONSTER_H = 28;        // 怪兽尺寸
 const ENEMY_BULLET_SPEED = 4.0;              // 怪兽弹幕速度
 const MONSTER_DMG = 1;                       // 怪兽碰撞伤害（扣心数）
+const BULLET_SPEED = 8;                      // 玩家子弹速度
 
 /* ============================================
  * 画布
@@ -293,6 +294,16 @@ function update() {
   keys._prevArrowLeft  = keys['ArrowLeft'];
   keys._prevArrowRight = keys['ArrowRight'];
 
+  /* === P1: J 射击 === */
+  if (keys['KeyJ'] && !window._shotCooldown) {
+    window._shotCooldown = true;
+    const bulletDir = p.dir || 1;
+    const bx = player.x + CHAR_W/2 + bulletDir*10;
+    const by = player.y + CHAR_H/2;
+    particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true});
+    setTimeout(() => { window._shotCooldown = false; }, 200);
+  }
+
   /* === P2: ↓ 快速下落 === */
   if (keys['ArrowDown'] && !player.onGround) {
     player.vy += FAST_FALL;
@@ -387,6 +398,22 @@ function update() {
   cameraX = player.x - CANVAS_W/3;
   if (cameraX < 0) cameraX = 0;
   if (cameraX > LEVEL_W - CANVAS_W) cameraX = LEVEL_W - CANVAS_W;
+
+  /* ---- 子弹命中怪兽 ---- */
+  for (let i=particles.length-1; i>=0; i--) {
+    const b = particles[i];
+    if (!b.isPlayerBullet) continue;
+    for (const m of MONSTERS) {
+      if (!m.alive) continue;
+      if (b.x > m.x && b.x < m.x+MONSTER_W && b.y > m.y && b.y < m.y+MONSTER_H) {
+        m.alive = false; m.squashT = 40;
+        particles.splice(i,1);
+        spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#7c3aed', 14);
+        spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#fff', 6);
+        break;
+      }
+    }
+  }
 
   /* ---- 怪物更新 ---- */
   for (const m of MONSTERS) {
@@ -505,7 +532,7 @@ function draw() {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
     ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
     ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
-    ctx.fillText('P1: A/D 移动 + W 二段跳  |  P2: ↑↓←→ 跳跃/冲刺', CANVAS_W/2, topOffset+60);
+    ctx.fillText('P1: A/D移动+W二段跳+J射击  |  P2: ↑↓←→ 跳跃/冲刺', CANVAS_W/2, topOffset+60);
     // 关卡列表
     const startY = topOffset + 90;
     for (let i=1; i<=totalLevels; i++) {
