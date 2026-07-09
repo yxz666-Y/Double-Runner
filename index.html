@@ -432,10 +432,10 @@ function update() {
     }
   }
 
-  /* ---- 弹幕碰撞玩家 ---- */
+  /* ---- 弹幕碰撞玩家（仅敌方子弹） ---- */
   for (let i=particles.length-1; i>=0; i--) {
     const b = particles[i];
-    if (!b.isBullet) continue;
+    if (!b.isBullet || b.isPlayerBullet) continue;
     if (player.x+CHAR_W > b.x-4 && player.x < b.x+4 &&
         player.y+CHAR_H > b.y-4 && player.y < b.y+4 && invincibleTimer <= 0) {
       particles.splice(i,1);
