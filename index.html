@@ -91,18 +91,17 @@ const LEVELS = {
   },
 };
 
-// 加载最高分
-try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}; } catch(e) { highScores = {}; }
-
 // 运行时关卡数据（由 loadLevel 填充）
 let LEVEL_W = 1500;
 let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
 let FLAG = {x:0,y:0,w:0,h:0};
 let currentLevel = 1;
 let menuSelection = 1;
-let levelTimer = 0;      // 关卡用时（帧数）
-let finalScore = 0;      // 通关得分
-let highScores = {};     // 每关最高分（从localStorage加载）
+let levelTimer = 0;
+let finalScore = 0;
+let highScores = {};
+// 加载最高分
+try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}; } catch(e) {}
 
 function loadLevel(id) {
   const lv = LEVELS[id]; if (!lv) return;
