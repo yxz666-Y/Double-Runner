@@ -15,8 +15,8 @@ canvas{display:block;border:1px solid #333}
 </head>
 <body>
 <div id="hud">
-  <span id="p1">P1: A/D 移动 | W 二段跳 | J 射击</span>
-  <span id="p2">P2: ↑ 跳 | ↓ 下落 | ←→ 冲刺</span>
+  <span id="p1">P1: A/D 移动 | W 二段跳</span>
+  <span id="p2">P2: ↑ 跳 | ↓ 射击/下落 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
@@ -294,8 +294,8 @@ function update() {
   keys._prevArrowLeft  = keys['ArrowLeft'];
   keys._prevArrowRight = keys['ArrowRight'];
 
-  /* === P1: J 射击 === */
-  if (keys['KeyJ'] && !window._shotCooldown) {
+  /* === P2: ↓ 射击（点按触发，非按住）=== */
+  if (keys['ArrowDown'] && !keys._prevArrowDown && !window._shotCooldown) {
     window._shotCooldown = true;
     const bulletDir = p.dir || 1;
     const bx = player.x + CHAR_W/2 + bulletDir*10;
@@ -303,6 +303,7 @@ function update() {
     particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true});
     setTimeout(() => { window._shotCooldown = false; }, 200);
   }
+  keys._prevArrowDown = keys['ArrowDown'];
 
   /* === P2: ↓ 快速下落 === */
   if (keys['ArrowDown'] && !player.onGround) {
@@ -532,7 +533,7 @@ function draw() {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
     ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
     ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
-    ctx.fillText('P1: A/D移动+W二段跳+J射击  |  P2: ↑↓←→ 跳跃/冲刺', CANVAS_W/2, topOffset+60);
+    ctx.fillText('P1: A/D移动+W二段跳  |  P2: ↑跳 ↓射击/快落 ←→冲刺', CANVAS_W/2, topOffset+60);
     // 关卡列表
     const startY = topOffset + 90;
     for (let i=1; i<=totalLevels; i++) {
