@@ -16,7 +16,7 @@ canvas{display:block;border:1px solid #333}
 <body>
 <div id="hud">
   <span id="p1">P1: A/D 移动 | W 二段跳</span>
-  <span id="p2">P2: ↑ 跳 | ↓ 射击/下落 | ←→ 冲刺</span>
+  <span id="p2">P2: ↑ 跳 | ↓ 射击 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
@@ -33,7 +33,6 @@ const GRAVITY      = 0.55;   // 重力加速度（px/frame²）
 const JUMP_V       = -9.0;   // 一段跳初速度
 const DOUBLE_JUMP_V= -7.5;   // 二段跳初速度
 const MOVE_SPEED   = 3.5;    // 水平移速（px/frame）
-const FAST_FALL    = 0.6;    // 快速下落额外加速度
 const DASH_SPEED   = 9;      // 冲刺速度
 const DASH_DURATION= 8;      // 冲刺持续帧数
 const DASH_COOLDOWN= 60;     // 冲刺冷却帧数
@@ -305,11 +304,6 @@ function update() {
   }
   keys._prevArrowDown = keys['ArrowDown'];
 
-  /* === P2: ↓ 快速下落 === */
-  if (keys['ArrowDown'] && !player.onGround) {
-    player.vy += FAST_FALL;
-  }
-
   /* === 无敌帧倒计时 === */
   if (invincibleTimer > 0) invincibleTimer--;
 
@@ -533,7 +527,7 @@ function draw() {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
     ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
     ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
-    ctx.fillText('P1: A/D移动+W二段跳  |  P2: ↑跳 ↓射击/快落 ←→冲刺', CANVAS_W/2, topOffset+60);
+    ctx.fillText('P1: A/D移动+W二段跳  |  P2: ↑跳 ↓射击 ←→冲刺', CANVAS_W/2, topOffset+60);
     // 关卡列表
     const startY = topOffset + 90;
     for (let i=1; i<=totalLevels; i++) {
