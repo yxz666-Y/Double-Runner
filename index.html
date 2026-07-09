@@ -530,7 +530,7 @@ function draw() {
     ctx.globalAlpha = alpha;
     ctx.fillStyle = p.color;
     const s = p.size || 3;
-    ctx.fillRect(p.x-cameraX-s/2, p.y-s/2, s, s);
+    ctx.fillRect(p.x-s/2, p.y-s/2, s, s);
     ctx.globalAlpha = 1;
   }
 
