@@ -91,6 +91,9 @@ const LEVELS = {
   },
 };
 
+// 加载最高分
+try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}; } catch(e) { highScores = {}; }
+
 // 运行时关卡数据（由 loadLevel 填充）
 let LEVEL_W = 1500;
 let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
@@ -99,6 +102,7 @@ let currentLevel = 1;
 let menuSelection = 1;
 let levelTimer = 0;      // 关卡用时（帧数）
 let finalScore = 0;      // 通关得分
+let highScores = {};     // 每关最高分（从localStorage加载）
 
 function loadLevel(id) {
   const lv = LEVELS[id]; if (!lv) return;
@@ -336,6 +340,9 @@ function update() {
     const deathPenalty = deaths * 200;
     finalScore = 1000 + timeBonus + coinBonus - deathPenalty;
     if (finalScore < 0) finalScore = 0;
+    // 更新最高分
+    const prev = highScores[currentLevel] || 0;
+    if (finalScore > prev) { highScores[currentLevel] = finalScore; localStorage.setItem('duoRunnerHighScores', JSON.stringify(highScores)); }
     const hasNext = currentLevel < Object.keys(LEVELS).length;
     showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  💀 '+deaths+
       '\n'+(hasNext?'Enter 下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
@@ -427,7 +434,8 @@ function draw() {
     ctx.font = 'bold 18px -apple-system';
     for (let i=1; i<=Object.keys(LEVELS).length; i++) {
       ctx.fillStyle = i===menuSelection ? '#fd0' : '#888';
-      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name, CANVAS_W/2, 260+i*40);
+      const hs = highScores[i] || 0;
+      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name + (hs?'  最高 '+hs:'  无记录'), CANVAS_W/2, 260+i*40);
       ctx.font = 'bold 18px -apple-system';
     }
     ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px -apple-system';
