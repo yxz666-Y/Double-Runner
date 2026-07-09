@@ -193,7 +193,7 @@ function update() {
     player.jumpsUsed = 1;
     djWindow = DJ_WINDOW;  // 开启二段跳时间窗
     p2JumpHeld = true;
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#5bf', 6);
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#5bf', 10);
   }
   if (!keys['ArrowUp']) p2JumpHeld = false;
 
@@ -204,8 +204,9 @@ function update() {
     player.vy = DOUBLE_JUMP_V;
     player.jumpsUsed++;
     djWindow = 0;
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fff', 14);
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fd0', 10);
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fff', 20);
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#fd0', 16);
+    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H, '#8cf', 12);
   }
 
   /* === 冲刺：P1按A/D开启就绪窗 → P2在窗内按同方向箭头触发 === */
@@ -235,11 +236,14 @@ function update() {
     if (dashL || syncL) {
       dashTimer = DASH_DURATION; dashDir = -1; dashCooldown = DASH_COOLDOWN;
       invincibleTimer = DASH_DURATION + 3; dashReadyL = 0;
-      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 16);
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#8cf', 10);
     }
     if (dashR || syncR) {
       dashTimer = DASH_DURATION; dashDir = 1; dashCooldown = DASH_COOLDOWN;
       invincibleTimer = DASH_DURATION + 3; dashReadyR = 0;
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 16);
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#8cf', 10);
       spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
     }
   }
