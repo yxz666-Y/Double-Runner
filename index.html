@@ -11,6 +11,31 @@ canvas{display:block;border:1px solid #333}
 #hud span{background:rgba(0,0,0,0.5);padding:4px 12px;border-radius:6px}
 #p1{color:#5bf}#p2{color:#fb5}
 #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;color:#fff;background:rgba(0,0,0,0.8);padding:16px 32px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;z-index:10;text-align:center}
+/* HUD 默认隐藏，游戏中才显示 */
+#hud{display:none}
+body.playing #hud, body.dead #hud, body.win #hud, body.gameover #hud{display:flex;gap:30px;color:#fff;font-size:13px;margin-bottom:4px}
+body.playing #hud span, body.dead #hud span, body.win #hud span, body.gameover #hud span{background:rgba(0,0,0,0.5);padding:4px 12px;border-radius:6px}
+/* 按键提示栏 */
+#hud-keys{display:none;gap:14px;color:#fff;font-size:12px;margin:4px 0 6px 0;align-items:center}
+body.playing #hud-keys, body.dead #hud-keys, body.win #hud-keys, body.gameover #hud-keys{display:flex}
+#hud-keys .kp{background:rgba(0,0,0,0.55);padding:4px 10px;border-radius:6px;letter-spacing:0.5px}
+#hud-keys .kp b{display:inline-block;background:#222;border:1px solid #555;border-bottom-width:2px;border-radius:4px;padding:1px 6px;margin:0 1px;font-size:11px;line-height:1;min-width:14px;text-align:center;color:#fff;transition:all 0.08s}
+#hud-keys .kp-p1 b{border-color:#5bf;color:#5bf;box-shadow:0 0 0 rgba(91,187,255,0)}
+#hud-keys .kp-p2 b{border-color:#fb5;color:#fb5;box-shadow:0 0 0 rgba(255,187,85,0)}
+#hud-keys .kp-esc b{border-color:#fd0;color:#fd0;box-shadow:0 0 0 rgba(255,221,0,0)}
+/* 按键按下时高亮（JS 会动态加 .on 类） */
+#hud-keys .kp b.on{background:currentColor;color:#000;border-color:#fff;transform:translateY(1px)}
+#hud-keys .kp-p1 .on{background:#5bf}
+#hud-keys .kp-p2 .on{background:#fb5}
+#hud-keys .kp-esc .on{background:#fd0}
+/* 设置面板遮罩 */
+#settings-panel{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:20;cursor:pointer}
+body.settings #settings-panel{display:flex}
+#settings-panel .box{background:rgba(20,20,30,0.95);border:2px solid #fd0;border-radius:14px;padding:28px 40px;min-width:360px;text-align:center;box-shadow:0 0 30px rgba(255,200,0,0.3)}
+#settings-panel h2{color:#fd0;font-size:28px;margin:0 0 18px 0;font-family:-apple-system,sans-serif}
+#settings-panel .opt{display:block;width:100%;margin:8px 0;padding:14px 0;font-size:20px;color:#fff;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;font-family:-apple-system,sans-serif;transition:all 0.15s}
+#settings-panel .opt:hover, #settings-panel .opt.sel{background:rgba(255,200,0,0.25);border-color:#fd0;color:#fd0;transform:scale(1.03)}
+#settings-panel .hint{margin-top:14px;font-size:13px;color:#888;font-family:-apple-system,sans-serif}
 </style>
 </head>
 <body>
@@ -20,8 +45,22 @@ canvas{display:block;border:1px solid #333}
   <span>👤 P1+P2</span>
   <span id="level-tag" style="color:#fd0">第 1 关</span>
 </div>
+<div id="hud-keys">
+  <span class="kp kp-p1"><b>A</b>/<b>D</b> 移动 · <b>W</b> 二段跳</span>
+  <span class="kp kp-p2"><b>↑</b> 跳 · <b>↓</b> 射击 · <b>←</b>/<b>→</b> 冲刺</span>
+  <span class="kp kp-esc"><b>ESC</b> 设置</span>
+</div>
 <canvas id="game"></canvas>
 <div id="msg"></div>
+<div id="settings-panel" onclick="if(event.target.id==='settings-panel')closeSettings()">
+  <div class="box">
+    <h2>⚙ 设置</h2>
+    <button class="opt" data-act="resume">▶ 继续游戏</button>
+    <button class="opt" data-act="restart">🔄 重新开始</button>
+    <button class="opt" data-act="menu">🏠 回到主页</button>
+    <div class="hint">↑↓ 选择  ·  Enter 确认  ·  ESC 关闭</div>
+  </div>
+</div>
 <audio id="bgmPlayer" loop preload="auto" style="display:none"></audio>
 <script>
 /* ============================================
@@ -57,9 +96,32 @@ const ctx = canvas.getContext('2d');
 let player = { x:60, y:GROUND_Y-CHAR_H-10, w:CHAR_W, h:CHAR_H, vx:0, vy:0, onGround:false, jumpsUsed:0, maxJumps:2 };
 let cameraX = 0;
 let lives = 3, coinsCollected = 0, deaths = 0;
-let gameState = 'menu'; // menu | playing | win | gameover
+let gameState = 'menu'; // menu | playing | win | dead | gameover | settings
 let deadTimer = 0, winTimer = 0;
 let particles = [];
+let prevGameState = ''; // 记录打开设置前的状态
+let settingsSelection = 0; // 0=继续 1=重新开始 2=回到主页
+
+// 同步 body class 以便 CSS 控制 HUD/设置面板显隐
+function setBodyState() { document.body.className = gameState; }
+setBodyState();
+
+// 同步顶部按键 HUD 高亮：把按键 code 映射到 .kp 内的 <b> 标签
+const KEY_HUD_MAP = {
+  KeyA: '.kp-p1 b:nth-child(1)',
+  KeyD: '.kp-p1 b:nth-child(2)',
+  KeyW: '.kp-p1 b:nth-child(3)',
+  ArrowLeft:  '.kp-p2 b:nth-child(1)',
+  ArrowUp:    '.kp-p2 b:nth-child(2)',
+  ArrowDown:  '.kp-p2 b:nth-child(3)',
+  ArrowRight: '.kp-p2 b:nth-child(4)',
+  Escape:     '.kp-esc b',
+};
+function syncKeyHud(code, isOn) {
+  const sel = KEY_HUD_MAP[code]; if (!sel) return;
+  const el = document.querySelector('#hud-keys ' + sel);
+  if (el) el.classList.toggle('on', !!isOn);
+}
 
 // ═══ 音效系统设置 ═══
 let sfxVolume = 0.7;
@@ -205,6 +267,7 @@ function loadLevel(id) {
   player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
   cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0; monsterKills = 0;
   gameState = 'playing';
+  setBodyState();
 }
 
 /* ============================================
@@ -214,8 +277,30 @@ const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
   e.preventDefault();
+  syncKeyHud(e.code, true);
   // 首次按键时初始化音频 + 启动 BGM
   initAudio();
+
+  // === ESC 打开/关闭设置面板 ===
+  if (e.code === 'Escape') {
+    if (gameState === 'settings') {
+      closeSettings(); // 关闭 → 回到原状态
+    } else if (gameState === 'playing' || gameState === 'dead' || gameState === 'win') {
+      openSettings();  // 打开
+    }
+    return;
+  }
+  // === 设置面板内的导航 ===
+  if (gameState === 'settings') {
+    if (e.code === 'ArrowUp')   { settingsSelection = (settingsSelection + 2) % 3; updateSettingsSel(); return; }
+    if (e.code === 'ArrowDown') { settingsSelection = (settingsSelection + 1) % 3; updateSettingsSel(); return; }
+    if (e.code === 'Enter' || e.code === 'Space') { handleSettingsAct(settingsActs[settingsSelection]); return; }
+    if (e.code === 'Digit1') { handleSettingsAct('resume'); return; }
+    if (e.code === 'Digit2') { handleSettingsAct('restart'); return; }
+    if (e.code === 'Digit3') { handleSettingsAct('menu'); return; }
+    return; // 设置面板打开时其他键屏蔽
+  }
+
   // 菜单控制：数字键或方向键选关
   if (gameState === 'menu') {
     if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); return; }
@@ -232,11 +317,83 @@ document.addEventListener('keydown', e => {
     if (e.code === 'Enter' || e.code === 'Space') {
       if (currentLevel < Object.keys(LEVELS).length) { loadLevel(currentLevel+1); return; }
     }
-    if (e.code === 'Backspace') { gameState = 'menu'; document.getElementById('msg').style.opacity = '0'; return; }
+    if (e.code === 'Backspace') { gameState = 'menu'; setBodyState(); document.getElementById('msg').style.opacity = '0'; return; }
   }
   if (e.code === 'KeyR' && (gameState === 'dead' || gameState === 'gameover')) resetLevel();
 });
-document.addEventListener('keyup', e => { keys[e.code] = false; e.preventDefault(); });
+document.addEventListener('keyup', e => { keys[e.code] = false; e.preventDefault(); syncKeyHud(e.code, false); });
+
+/* ============================================
+ * 设置面板
+ * ============================================ */
+const settingsActs = ['resume', 'restart', 'menu'];
+function openSettings() {
+  prevGameState = gameState;
+  gameState = 'settings';
+  settingsSelection = 0;
+  setBodyState();
+  // 清除可能残留的内联 display 样式，让 CSS class 生效
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.style.display = '';
+  updateSettingsSel();
+}
+function closeSettings() {
+  // 默认回到打开设置前的状态
+  gameState = prevGameState || 'playing';
+  prevGameState = '';
+  setBodyState();
+  // 清除可能残留的内联 display 样式，让 CSS class 生效
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.style.display = '';
+  document.querySelectorAll('#settings-panel .opt').forEach(b => b.classList.remove('sel'));
+}
+function handleSettingsAct(act) {
+  if (act === 'resume') {
+    closeSettings();
+  } else if (act === 'restart') {
+    // 重新开始本关：完全重置
+    gameState = 'playing'; // 临时先切走，避免 loadLevel 内的死路
+    prevGameState = '';
+    setBodyState();
+    const panel = document.getElementById('settings-panel');
+    if (panel) panel.style.display = '';
+    document.querySelectorAll('#settings-panel .opt').forEach(b => b.classList.remove('sel'));
+    resetLevel();
+  } else if (act === 'menu') {
+    // 回到主页菜单
+    gameState = 'menu';
+    prevGameState = '';
+    setBodyState();
+    // 清理内联 display，让 CSS class 控制显隐
+    const panel = document.getElementById('settings-panel');
+    if (panel) panel.style.display = '';
+    document.querySelectorAll('#settings-panel .opt').forEach(b => b.classList.remove('sel'));
+    // 重置玩家到初始位置以免下次进游戏位置错乱
+    player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
+    player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
+    // 重置安全位置/相机
+    lastSafeX = 60; lastSafeY = GROUND_Y - CHAR_H - 10;
+    cameraX = 0;
+    // 清除残留子弹粒子
+    particles = particles.filter(p => !p.isBullet && !p.isPlayerBullet);
+    // 不重置关卡进度（用户可重新选关）
+    document.getElementById('msg').style.opacity = '0';
+    // 清除所有按键状态，防止菜单中按着的键影响下次进入游戏
+    for (const k in keys) { if (keys[k]) syncKeyHud(k, false); keys[k] = false; }
+  }
+}
+function updateSettingsSel() {
+  const btns = document.querySelectorAll('#settings-panel .opt');
+  btns.forEach((b, i) => b.classList.toggle('sel', i === settingsSelection));
+}
+// 绑定鼠标点击
+document.querySelectorAll('#settings-panel .opt').forEach((btn, idx) => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsSelection = idx;
+    handleSettingsAct(btn.dataset.act);
+  });
+});
 
 /* ============================================
  * 碰撞检测
@@ -265,6 +422,8 @@ function spawnParticles(x, y, color, count) {
  * ============================================ */
 function update() {
   try {
+  // 设置面板打开时：完全暂停（不计时、不更新物理）
+  if (gameState === 'settings') return;
   if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
@@ -283,6 +442,7 @@ function update() {
       player.jumpsUsed = 0;
       invincibleTimer = 90;
       gameState = 'playing';
+      setBodyState();
       document.getElementById('msg').style.opacity = '0';
     }
     return;
@@ -450,6 +610,7 @@ function update() {
   /* ---- 终点旗帜 ---- */
   if (rectCollide(player, FLAG)) {
     gameState = 'win';
+    setBodyState();
     winTimer = 0;
     sfxWin();
     const seconds = Math.floor(levelTimer / 60);
@@ -571,6 +732,7 @@ function die(fromFall) {
       if (gameState === 'gameover') resetLevel();
     }, 1200);
     gameState = 'gameover';
+    setBodyState();
   } else {
     // 进入 'dead' 状态：暂停 60 帧（约 1 秒），期间玩家无敌
     // 此期间可以按 R 立即重置本关，否则自动复活继续
@@ -578,6 +740,7 @@ function die(fromFall) {
     player.jumpsUsed = 0;
     invincibleTimer = 120;
     gameState = 'dead';
+    setBodyState();
     deadTimer = 60;
     document.getElementById('msg').style.opacity = '1';
     document.getElementById('msg').innerHTML = '💔 -1  ·  按 R 重置';
@@ -615,7 +778,9 @@ function resetLevel() {
   if (msgStayTimer) { clearTimeout(msgStayTimer); msgStayTimer = null; }
   // 清除 R 键状态，防止按住 R 反复触发
   keys['KeyR'] = false;
+  syncKeyHud('KeyR', false);
   gameState = 'playing';
+  setBodyState();
   showMsg('已重置本关');
 }
 
@@ -799,6 +964,26 @@ function draw() {
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.fillRect(px+4, py+CHAR_H-2, 20, 4);
 
+    // 冲刺冷却进度条（帽子正上方）
+    if (dashCooldown > 0) {
+      // 冷却中：白色，长度随剩余时间增长（0→满）
+      const remain = dashCooldown / DASH_COOLDOWN;     // 1=刚开始 0=刚结束
+      const fillW = CHAR_W * (1 - remain);              // 从 0 增长到 CHAR_W
+      // 背景槽
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(px, py-10, CHAR_W, 4);
+      // 白色填充
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(px, py-10, fillW, 4);
+    } else if (dashTimer <= 0) {
+      // 冷却完成且当前未在冲刺：满长橙色
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(px, py-10, CHAR_W, 4);
+      ctx.fillStyle = '#fb5';
+      ctx.fillRect(px, py-10, CHAR_W, 4);
+    }
+    // 冲刺中（dashTimer > 0）：不画进度条
+
     // 帽子（红色）
     ctx.fillStyle = dashTimer>0?'#ff8888':'#e83030';
     d(px+4, py-3, 20, 8);
@@ -873,6 +1058,97 @@ function draw() {
 
   ctx.restore();
 
+  /* ---- 屏幕底部按键提示（按键响应可视化） ---- */
+  drawKeyHud();
+
+}
+
+/* ============================================
+ * 按键 HUD —— 屏幕底部
+ * ============================================ */
+function drawKey() {
+  // 通用绘制：键位方块
+  // args: x, y, label, isOn, onColor
+}
+function drawKeyHud() {
+  if (gameState !== 'playing' && gameState !== 'dead' && gameState !== 'win' && gameState !== 'gameover') return;
+
+  const keyW = 30, keyH = 30, gap = 4;
+  const p1Color = '#5bf', p2Color = '#fb5';
+
+  // 屏幕底部居中
+  const totalW = (keyW * 3 + gap * 2) + 60 + (keyW * 3 + gap * 2) + 60; // P1 4键 + 分隔 + P2 5键
+  const baseX = (CANVAS_W - totalW) / 2;
+  const baseY = CANVAS_H - keyH - 6;
+
+  ctx.font = '11px -apple-system';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  let x = baseX;
+
+  // ── P1 标签 ──
+  ctx.fillStyle = p1Color;
+  ctx.fillText('P1', x + 10, baseY + keyH/2);
+  x += 24;
+
+  // A
+  drawKeyBox(x, baseY, keyW, keyH, 'A', !!keys['KeyA'], p1Color);
+  x += keyW + gap;
+  // D
+  drawKeyBox(x, baseY, keyW, keyH, 'D', !!keys['KeyD'], p1Color);
+  x += keyW + gap;
+  // W
+  drawKeyBox(x, baseY, keyW, keyH, 'W', !!keys['KeyW'], p1Color);
+  x += keyW + gap;
+  // 空白位以让 P1/P2 间距更宽
+  x += 20;
+
+  // ── P2 标签 ──
+  ctx.fillStyle = p2Color;
+  ctx.fillText('P2', x + 10, baseY + keyH/2);
+  x += 24;
+
+  // ←
+  drawKeyBox(x, baseY, keyW, keyH, '←', !!keys['ArrowLeft'], p2Color);
+  x += keyW + gap;
+  // ↑
+  drawKeyBox(x, baseY, keyW, keyH, '↑', !!keys['ArrowUp'], p2Color);
+  x += keyW + gap;
+  // ↓
+  drawKeyBox(x, baseY, keyW, keyH, '↓', !!keys['ArrowDown'], p2Color);
+  x += keyW + gap;
+  // →
+  drawKeyBox(x, baseY, keyW, keyH, '→', !!keys['ArrowRight'], p2Color);
+  x += keyW + gap;
+  // ESC
+  drawKeyBox(x, baseY, keyW * 1.3, keyH, 'ESC', !!keys['Escape'], '#fd0');
+}
+
+function drawKeyBox(x, y, w, h, label, isOn, color) {
+  // 阴影
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x+1, y+2, w, h);
+  // 底色（按下时高亮）
+  if (isOn) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+  } else {
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(x, y, w, 3); // 顶部高光
+  }
+  // 边框
+  ctx.strokeStyle = isOn ? '#fff' : '#555';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x+0.5, y+0.5, w-1, h-1);
+  // 文字
+  ctx.fillStyle = isOn ? '#000' : '#fff';
+  ctx.font = isOn ? 'bold 13px -apple-system' : '12px -apple-system';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w/2, y + h/2 + 1);
 }
 
 /* ============================================
