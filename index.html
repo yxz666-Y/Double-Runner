@@ -272,7 +272,7 @@ try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}
 function loadLevel(id) {
   const lv = LEVELS[id]; if (!lv) return;
   document.getElementById('msg').style.opacity = '0'; // 清除旧消息
-  GROUNDS = lv.grounds.map(o => ({...o, type:'ground'}));
+  GROUNDS = lv.grounds.map(o => ({x:o.x-8, y:o.y, w:o.w+16, h:o.h, type:'ground'})); // 碰撞区扩8px防边缘漏缝
   PLATFORMS = lv.platforms.map(o => ({...o, type:'platform'}));
   SPIKES = lv.spikes.map(o => ({...o}));
   COINS = lv.coins.map(o => ({...o}));
