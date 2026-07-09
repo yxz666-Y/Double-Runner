@@ -293,16 +293,15 @@ function update() {
   keys._prevArrowLeft  = keys['ArrowLeft'];
   keys._prevArrowRight = keys['ArrowRight'];
 
-  /* === P2: ↓ 射击（点按触发，非按住）=== */
-  if (keys['ArrowDown'] && !keys._prevArrowDown && !window._shotCooldown) {
-    window._shotCooldown = true;
+  /* === P2: ↓ 射击 === */
+  if (keys['ArrowDown'] && !keys._shotFired) {
+    keys._shotFired = true;
     const bulletDir = p.dir || 1;
     const bx = player.x + CHAR_W/2 + bulletDir*10;
     const by = player.y + CHAR_H/2;
-    particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true});
-    setTimeout(() => { window._shotCooldown = false; }, 200);
+    particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true, isBullet:true});
   }
-  keys._prevArrowDown = keys['ArrowDown'];
+  if (!keys['ArrowDown']) keys._shotFired = false;
 
   /* === 无敌帧倒计时 === */
   if (invincibleTimer > 0) invincibleTimer--;
@@ -447,7 +446,7 @@ function update() {
   for (let i=particles.length-1; i>=0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy;
-    if (!p.isBullet) p.vy += 0.1;
+    if (!p.isBullet && !p.isPlayerBullet) p.vy += 0.1;
     p.life--;
     if (p.life <= 0) particles.splice(i,1);
   }
