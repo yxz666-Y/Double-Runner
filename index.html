@@ -52,10 +52,10 @@ const ctx = canvas.getContext('2d');
 /* ============================================
  * 游戏状态
  * ============================================ */
-let player = { x:60, y:GROUND_Y-CHAR_H-10, vx:0, vy:0, onGround:false, jumpsUsed:0, maxJumps:2 };
+let player = { x:60, y:GROUND_Y-CHAR_H-10, w:CHAR_W, h:CHAR_H, vx:0, vy:0, onGround:false, jumpsUsed:0, maxJumps:2 };
 let cameraX = 0;
 let lives = 3, coinsCollected = 0, deaths = 0;
-let gameState = 'playing'; // playing | win | dead | gameover
+let gameState = 'menu'; // menu | playing | win | gameover
 let deadTimer = 0, winTimer = 0;
 let particles = [];
 
@@ -91,9 +91,9 @@ const PLATFORMS = [
 ];
 
 const SPIKES = [
-  {x:380, y:GROUND_Y-20, w:80, h:20},
-  {x:780, y:GROUND_Y-20, w:100, h:20},
-  {x:1100,y:GROUND_Y-20, w:80, h:20},
+  {x:150, y:GROUND_Y-20, w:60, h:20},
+  {x:420, y:GROUND_Y-20, w:80, h:20},
+  {x:950, y:GROUND_Y-20, w:80, h:20},
 ];
 
 const COINS = [
@@ -144,20 +144,24 @@ function spawnParticles(x, y, color, count) {
  * 更新
  * ============================================ */
 function update() {
-  if (gameState === 'win') { winTimer++; if (winTimer>120) return; }
-  if (gameState === 'dead') { deadTimer--; if (deadTimer<=0) respawn(); return; }
+  if (gameState === 'menu') {
+    if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
+    return;
+  }
+  if (gameState === 'win') { winTimer++; if (winTimer>180) location.reload(); return; }
   if (gameState === 'gameover') return;
 
   /* ==========================================
    * 操作处理
    * ========================================== */
 
-  // === P1: A/D 水平移动（冲刺中不覆盖） ===
+  // === P1: A/D 水平移动 ===
   const p1Left = keys['KeyA'], p1Right = keys['KeyD'];
   if (dashTimer <= 0) {
+    const airControl = player.onGround ? 1 : 0.5; // 空中操控减半
     player.vx = 0;
-    if (p1Left)  player.vx = -MOVE_SPEED;
-    if (p1Right) player.vx = MOVE_SPEED;
+    if (p1Left)  player.vx = -MOVE_SPEED * airControl;
+    if (p1Right) player.vx = MOVE_SPEED * airControl;
   }
 
   /* === P2: ↑ 跳跃（仅地面） === */
@@ -238,16 +242,19 @@ function update() {
   if (player.x < 0) player.x = 0;
   if (player.x > LEVEL_W - CHAR_W) player.x = LEVEL_W - CHAR_W;
 
-  /* ---- 碰撞（先Y后X，防止隧道效应） ---- */
+  /* ---- 碰撞 ---- */
+  const prevBottom = player.y + CHAR_H - player.vy;
+  const pcx = player.x + CHAR_W / 2;
+  const halfW = CHAR_W * 0.4; // 判定宽度：中心±40%，大半悬空即掉落
   player.onGround = false;
   const allSolids = [...GROUNDS, ...PLATFORMS];
-
-  // Y轴碰撞
   for (const s of allSolids) {
-    if (player.x+CHAR_W <= s.x || player.x >= s.x+s.w) continue; // X轴未对齐
-    if (player.y+CHAR_H <= s.y || player.y >= s.y+s.h) continue; // Y轴未重叠
-    // 重叠了——判断方向
-    if (player.vy >= 0) { // 下落→站上去
+    if (pcx + halfW <= s.x || pcx - halfW >= s.x + s.w) continue;
+    if (player.y+CHAR_H <= s.y || player.y >= s.y+s.h) continue;
+
+    if (player.vy >= 0) { // 下落
+      // 只有脚之前在上面才站上去（防侧面吸上去）
+      if (prevBottom > s.y + s.h) continue;
       player.y = s.y - CHAR_H;
       player.vy = 0;
       player.onGround = true;
@@ -266,15 +273,21 @@ function update() {
     else if (player.vx < 0) player.x = s.x + s.w;
   }
 
+  /* ---- 记录安全位置 ---- */
+  if (player.onGround) { lastSafeX = player.x; lastSafeY = player.y; }
+
   /* ---- 尖刺 ---- */
-  if (invincibleTimer <= 0) {
-    for (const s of SPIKES) {
-      if (rectCollide(player, s)) die();
+  for (const s of SPIKES) {
+    if (pcx + 6 > s.x && pcx - 6 < s.x + s.w &&
+        player.y + CHAR_H > s.y && player.y < s.y + s.h &&
+        invincibleTimer <= 0) {
+      die(false);
+      break;
     }
   }
 
   /* ---- 掉出屏幕 ---- */
-  if (player.y > CANVAS_H + 80 && invincibleTimer <= 0) die();
+  if (player.y > CANVAS_H + 80 && invincibleTimer <= 0) die(true);
 
   /* ---- 金币 ---- */
   for (let i = COINS.length-1; i >= 0; i--) {
@@ -307,24 +320,34 @@ function update() {
   document.getElementById('coins').textContent = coinsCollected;
 }
 
-function die() {
+let lastSafeX = 60, lastSafeY = GROUND_Y - CHAR_H - 10;
+
+function die(fromFall) {
   if (gameState !== 'playing') return;
   lives--; deaths++;
+  spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#f44', 30);
+  document.getElementById('lives').textContent = lives;
+
   if (lives <= 0) {
     gameState = 'gameover';
-    showMsg('💀 生命耗尽！\n按 R 重新开始', false);
+    showMsg('💀 生命耗尽！游戏重新开始...', false);
+    setTimeout(() => location.reload(), 2000);
   } else {
-    gameState = 'dead';
-    deadTimer = 40;
-    spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#f44', 20);
+    // 原地复活 或 悬崖边复活
+    if (fromFall) {
+      player.x = lastSafeX;
+      player.y = lastSafeY;
+    } else {
+      player.y = lastSafeY;
+    }
+    player.vy = 0; player.vx = 0;
+    player.jumpsUsed = 0;
+    invincibleTimer = 120;
+    gameState = 'playing';
+    document.getElementById('msg').style.opacity = '1';
+    document.getElementById('msg').innerHTML = '💔 -1';
+    setTimeout(() => { document.getElementById('msg').style.opacity = '0'; }, 800);
   }
-}
-
-function respawn() {
-  player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
-  player.vx = 0; player.vy = 0;
-  player.jumpsUsed = 0;
-  gameState = 'playing';
 }
 
 function resetLevel() {
@@ -340,6 +363,34 @@ function resetLevel() {
  * 渲染
  * ============================================ */
 function draw() {
+  ctx.globalAlpha = 1; // 每帧强制重置，防闪现
+  // 通关画面
+  if (gameState === 'win') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+    ctx.fillStyle = '#fd0'; ctx.font = 'bold 40px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎉 完美配合！', CANVAS_W/2, 200);
+    ctx.fillText('通关成功！', CANVAS_W/2, 250);
+    ctx.fillStyle = '#fff'; ctx.font = '16px -apple-system';
+    ctx.fillText('3秒后返回主菜单', CANVAS_W/2, 300);
+    ctx.textAlign = 'left';
+    return;
+  }
+  // 开始画面
+  if (gameState === 'menu') {
+    ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillText('双人跑酷', CANVAS_W/2, 180);
+    ctx.font = '16px -apple-system'; ctx.fillStyle = '#aaa';
+    ctx.fillText('P1: A/D 移动 | P2: ↑ 跳跃', CANVAS_W/2, 230);
+    ctx.fillText('P1+2: 冲刺 & 二段跳', CANVAS_W/2, 255);
+    ctx.fillStyle = '#ff0'; ctx.font = 'bold 22px -apple-system';
+    ctx.fillText('按 ENTER 开始游戏', CANVAS_W/2, 320);
+    ctx.textAlign = 'left';
+    return;
+  }
+
   ctx.save();
   ctx.translate(-cameraX, 0);
 
@@ -400,9 +451,11 @@ function draw() {
   }
 
   /* ---- 角色 ---- */
-  const showChar = gameState !== 'dead' || Math.floor(deadTimer/4)%2 === 0;
-  const invBlink = invincibleTimer > 0 && Math.floor(invincibleTimer/2)%2 === 0;
-  if (showChar && !invBlink) {
+  const showChar = gameState !== 'gameover';
+  if (invincibleTimer > 0) {
+    ctx.globalAlpha = 0.4 + Math.sin(invincibleTimer * 0.5) * 0.2;
+  }
+  if (showChar) {
     const p = player;
     // 阴影
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(p.x+2, p.y+CHAR_H-2, CHAR_W-4, 4);
@@ -434,13 +487,15 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x+CHAR_W/2, p.y+CHAR_H, 20, 0, Math.PI*2); ctx.fill();
     }
   }
+  ctx.globalAlpha = 1;
 
   /* ---- 粒子 ---- */
   for (const p of particles) {
-    ctx.fillStyle = p.color; ctx.globalAlpha = p.life/40;
+    ctx.globalAlpha = p.life/40;
+    ctx.fillStyle = p.color;
     ctx.fillRect(p.x-cameraX-2, p.y-2, 4, 4);
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
 
   ctx.restore();
 
