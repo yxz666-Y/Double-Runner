@@ -322,7 +322,8 @@ let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [], MONSTERS = [];
 let FLAG = {x:0,y:0,w:0,h:0};
 let currentLevel = 1;
 let menuSelection = 1;
-let charSelect = 0; // 0=男 1=女
+let charSelect = 0; // 0=男 1=女 2=猫 3=机器人
+const CHAR_NAMES = ['👦 男孩','👧 女孩','🐱 橘猫','🤖 机器人'];
 let levelTimer = 0;
 let finalScore = 0;
 let monsterKills = 0;
@@ -390,7 +391,7 @@ document.addEventListener('keydown', e => {
     if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); return; }
     if (e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; return; }
     if (e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; return; }
-    if (e.code === 'Tab') { charSelect = charSelect===0?1:0; return; }
+    if (e.code === 'Tab') { charSelect = (charSelect+1)%4; return; }
     if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); playBGM(); return; }
   }
   // 胜利菜单控制
@@ -907,7 +908,7 @@ function draw() {
       ctx.fillText((sel?'▶ ':'  ')+'第'+i+'关  '+LEVELS[i].name+(hs?'  最高'+hs:'  无记录'), CANVAS_W/2, y);
     }
     ctx.font = '13px -apple-system'; ctx.fillStyle = '#ff0';
-    ctx.fillText('Tab 切换角色: '+(charSelect===0?'👦 男性':'👧 女性')+'  |  ↑↓ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+30);
+    ctx.fillText('Tab 切换('+CHAR_NAMES[charSelect]+')  |  ↑↓ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+30);
     if (window._err) { ctx.fillStyle='#f44'; ctx.font='12px monospace'; ctx.fillText('错误: '+window._err, CANVAS_W/2, startY+totalLevels*rowH+50); }
     ctx.textAlign = 'left'; return;
   }
@@ -1046,7 +1047,7 @@ function draw() {
     // 调色板: 0透明 1发色 2发暗 3肤色 4肤暗 5眼白 6瞳 7嘴
     //         8白T 9T暗 A牛仔裤 B裤亮 C鞋面 D鞋底 E金 F白 G黑发
     const C = [null,'#4a3728','#2a1a10','#ffe8c0','#e8c8a0','#fff','#111','#c44',
-               '#f8f8f8','#ddd','#3058d8','#5080f0','#e8e8e8','#444','#fd0','#fff','#1a1a1a','#111','#ff4080','#111'];
+               '#f8f8f8','#ddd','#3058d8','#5080f0','#e8e8e8','#444','#fd0','#fff','#1a1a1a','#111','#ff4080','#111','#f09030','#ffd060','#888','#ff4444','#333'];
     // 男性精灵 [17×14]
     const spMStand = [
       '00011111111100','00111111111110','01122222222211','01111111111111',
@@ -1077,10 +1078,44 @@ function draw() {
       '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0AA0BBB0AAAB0',
       '00CCDDDDDDCC00','000DDDDDDDD000',
     ];
-    const isFemale = charSelect === 1;
-    const spStand = isFemale ? spFStand : spMStand;
-    const spAir = isFemale ? spFAir : spMAir;
-    const sprite = inAir ? spAir : spStand;
+    // 猫精灵（橘猫K=橙 L=浅黄 F=白）
+    const spCatStand = [
+      '00011111111100','00111111111110','01122222222211','01153333333511',
+      '11156636336511','11156636336511','11153333333511','11113333337111',
+      '0LFLFLFLFLFLF0','0LFLFLFLFLFLF0','0LL00LLFF00LL0','0AAABBBBAAAB0',
+      '0AAABBBBAAAB0','0AAABBBBAAAB0','0AAABBBBAAAB0',
+      '00CCDDDDDDCC00','000DDDDDDDD000',
+    ];
+    const spCatAir = [
+      '00011111111100','00111111111110','01122222222211','03533333333533',
+      '11156636336511','11156636336511','11153333333511','11113333337111',
+      '0LFLFLFLFLFLF0','0LFLFLFLFLFLF0','0LL00LLFF00LL0','0AAABBBBAAAB0',
+      '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0AA0BBB0AAAB0',
+      '00CCDDDDDDCC00','000DDDDDDDD000',
+    ];
+    // 机器人（O灰 P红眼 Q深灰）
+    const spRobotStand = [
+      '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
+      '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
+      '08888888888880','08999999999980','0AAAAABBBBAAA0','0AAABBBBAAAB0',
+      '0AAABBBBAAAB0','0AAABBBBAAAB0','0OOQQQQQQQQOO0',
+      '00CCDDDDDDCC00','000DDDDDDDD000',
+    ];
+    const spRobotAir = [
+      '000OOOOOOOO0000','00OOOOOOOOOO00','0OOQQQQQQQQOO0','0OQ55555555QO0',
+      '0OQ5P66P665QO0','0OQ5P6655P5QO0','0OQ55555555QO0','08888888888880',
+      '08888888888880','08999999999980','0AAAAABBBBAAA0','0AA0BBB0AAAB0',
+      '0AA0BBB0AAAB0','0AA0BBB0AAAB0','0OOQQQQQQQQOO0',
+      '00CCDDDDDDCC00','000DDDDDDDD000',
+    ];
+    const ALL_SPRITES = [
+      {stand:spMStand, air:spMAir},
+      {stand:spFStand, air:spFAir},
+      {stand:spCatStand, air:spCatAir},
+      {stand:spRobotStand, air:spRobotAir},
+    ];
+    const sp = ALL_SPRITES[charSelect] || ALL_SPRITES[0];
+    const sprite = inAir ? sp.air : sp.stand;
 
     // 阴影
     ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(px+4,py+CHAR_H-2,20,4);
@@ -1088,7 +1123,7 @@ function draw() {
     // 绘制像素
     for (let sy=0; sy<sprite.length; sy++) {
       for (let sx=0; sx<sprite[sy].length; sx++) {
-        const ci = sprite[sy][sx], c = C[parseInt(ci,16)];
+        const ci = sprite[sy][sx], c = C[parseInt(ci,36)];
         if (!c) continue;
         ctx.fillStyle = c;
         const dx = flipX ? (CHAR_W - (sx+1)*PS) : sx*PS;
