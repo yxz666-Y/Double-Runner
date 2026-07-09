@@ -93,7 +93,7 @@ body.audiosettings #audio-panel{display:flex}
     <div class="hint">拖动滑块调节音量</div>
   </div>
 </div>
-<audio id="bgmPlayer" loop preload="auto" style="display:none"></audio>
+<audio id="bgmPlayer" loop preload="auto" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" src="bgm.mp3"></audio>
 <script>
 /* ============================================
  * 常量 —— 调参区
@@ -135,7 +135,9 @@ let prevGameState = ''; // 记录打开设置前的状态
 let settingsSelection = 0; // 0=继续 1=重新开始 2=回到主页
 
 // 同步 body class 以便 CSS 控制 HUD/设置面板显隐
-function setBodyState() { document.body.className = gameState; }
+function setBodyState() {
+  document.body.className = gameState;
+}
 setBodyState();
 
 // 同步顶部按键 HUD 高亮：把按键 code 映射到 .kp 内的 <b> 标签
@@ -361,6 +363,8 @@ function cnTextWidth(text, pixel) {
 // ═══ 音效系统设置 ═══
 let sfxVolume = 0.7;
 let musicVolume = 0.5;
+// 实际播放时给 BGM 的音量倍率（HTMLAudioElement 不能太响，先压到 0.6 再乘 musicVolume）
+const BGM_VOL_SCALE = 0.6;
 // 加载本地存储的音量
 try {
   const saved = JSON.parse(localStorage.getItem('duoRunnerAudio') || '{}');
@@ -397,28 +401,57 @@ function sfxShoot()   { playTone(800, 0.05, 'square', 0.4); playTone(1200, 0.04,
 function sfxBump()    { playTone(180, 0.08, 'square', 0.5); }
 function sfxPause()   { playTone(440, 0.06, 'sine', 0.6); setTimeout(()=>playTone(330,0.06,'sine',0.5),80); }
 
+// === 专属交互音效 ===
+// Enter 确认：上升两音+亮尾音（清亮、像"叮咚"）
+function sfxConfirm() {
+  playTone(660, 0.08, 'sine', 0.9);
+  setTimeout(() => playTone(880, 0.10, 'sine', 0.9), 70);
+  setTimeout(() => playTone(1320, 0.14, 'sine', 0.7), 140);
+}
+// Backspace 返回：下降两音（低沉、像"关门"）
+function sfxBack() {
+  playTone(330, 0.10, 'sine', 0.7);
+  setTimeout(() => playTone(220, 0.14, 'sine', 0.6), 90);
+}
+// 按钮切换/移动（↑↓ Tab）：柔和短音（像菜单 hover）
+function sfxClick() {
+  playTone(520, 0.05, 'square', 0.5);
+}
+// 滑动条/滑块拖动：极短高频
+function sfxTick() {
+  playTone(1200, 0.03, 'sine', 0.3);
+}
+
 // ═══ 背景音乐 ═══
 let bgmAudio = null;
+// ═══ 菜单/开始界面 BGM ═══
+// 设计：仅在主菜单（gameState==='menu'）播放；进入关卡（playing/dead/win/settings/audiosettings/gameover）暂停；
+//        回到主菜单重新播放
+/** 启动 BGM（一次性，整个游戏期间一直循环播放） */
 function playBGM() {
-  if (bgmAudio) return;
-  const el = document.getElementById('bgmPlayer');
-  // 若 HTML 里没指定 src，可在这里切换
-  if (!el.src) el.src = 'bgm.mp3';
-  bgmAudio = el;
-  bgmAudio.volume = musicVolume * 0.3;
-  bgmAudio.play().catch(e => {
-    // 备用：用户首次点击时再尝试播放（浏览器自动播放策略）
-    document.addEventListener('click', function playOnce() {
-      bgmAudio.play().catch(()=>{});
-      document.removeEventListener('click', playOnce);
-    }, {once:true});
-  });
+  try {
+    const el = document.getElementById('bgmPlayer');
+    if (!el) return;
+    if (!bgmAudio) {
+      if (!el.src || el.src.endsWith('/')) el.src = 'bgm.mp3';
+      bgmAudio = el;
+      bgmAudio.loop = true;
+    }
+    bgmAudio.volume = musicVolume * BGM_VOL_SCALE;
+    // 始终尝试播放（paused 状态时 play() 才会启动；已经播放时 noop）
+    const p = bgmAudio.play();
+    if (p && p.catch) p.catch(err => console.warn('[BGM] play rejected:', err.message));
+  } catch(e) { console.warn('[BGM] err:', e.message); }
 }
 function updateBGMVolume() {
-  if (bgmAudio) bgmAudio.volume = musicVolume * 0.3;
+  try {
+    if (bgmAudio) bgmAudio.volume = musicVolume * BGM_VOL_SCALE;
+  } catch(e) { /* 静默 */ }
 }
 function stopBGM() {
-  if (bgmAudio) { bgmAudio.pause(); bgmAudio = null; }
+  try {
+    if (bgmAudio) { bgmAudio.pause(); bgmAudio = null; }
+  } catch(e) { /* 静默 */ }
 }
 
 // 冲刺 & 二段跳状态
@@ -609,6 +642,8 @@ document.addEventListener('keydown', e => {
   syncKeyHud(e.code, true);
   // 首次按键时初始化音频 + 启动 BGM
   initAudio();
+  // 任意按键都尝试启动/恢复 BGM（被自动播放策略挡住时会在交互后再试）
+  playBGM();
 
   // === ESC 打开/关闭设置面板 ===
   if (e.code === 'Escape') {
@@ -623,12 +658,12 @@ document.addEventListener('keydown', e => {
   }
   // === 设置面板内的导航 ===
   if (gameState === 'settings') {
-    if (e.code === 'ArrowUp')   { settingsSelection = (settingsSelection + 2) % 3; updateSettingsSel(); return; }
-    if (e.code === 'ArrowDown') { settingsSelection = (settingsSelection + 1) % 3; updateSettingsSel(); return; }
-    if (e.code === 'Enter' || e.code === 'Space') { handleSettingsAct(settingsActs[settingsSelection]); return; }
-    if (e.code === 'Digit1') { handleSettingsAct('resume'); return; }
-    if (e.code === 'Digit2') { handleSettingsAct('restart'); return; }
-    if (e.code === 'Digit3') { handleSettingsAct('menu'); return; }
+    if (e.code === 'ArrowUp')   { settingsSelection = (settingsSelection + 2) % 3; updateSettingsSel(); sfxClick(); return; }
+    if (e.code === 'ArrowDown') { settingsSelection = (settingsSelection + 1) % 3; updateSettingsSel(); sfxClick(); return; }
+    if (e.code === 'Enter' || e.code === 'Space') { sfxConfirm(); handleSettingsAct(settingsActs[settingsSelection]); return; }
+    if (e.code === 'Digit1') { sfxConfirm(); handleSettingsAct('resume'); return; }
+    if (e.code === 'Digit2') { sfxConfirm(); handleSettingsAct('restart'); return; }
+    if (e.code === 'Digit3') { sfxConfirm(); handleSettingsAct('menu'); return; }
     return; // 设置面板打开时其他键屏蔽
   }
 
@@ -636,10 +671,11 @@ document.addEventListener('keydown', e => {
   if (gameState === 'menu') {
     if (menuMode === 'main') {
       // 主菜单：↑↓ 切换按钮（上下排列），Enter 确认
-      if (e.code === 'ArrowUp' || e.code === 'KeyW') { menuBtnSel = 0; return; }
-      if (e.code === 'ArrowDown' || e.code === 'KeyS') { menuBtnSel = 1; return; }
-      if (e.code === 'Tab') { menuBtnSel = 1 - menuBtnSel; return; }
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') { if (menuBtnSel !== 0) { menuBtnSel = 0; sfxClick(); } return; }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') { if (menuBtnSel !== 1) { menuBtnSel = 1; sfxClick(); } return; }
+      if (e.code === 'Tab') { menuBtnSel = 1 - menuBtnSel; sfxClick(); return; }
       if (e.code === 'Enter' || e.code === 'Space') {
+        sfxConfirm();
         if (menuBtnSel === 0) {
           // START → 进入选关
           menuMode = 'level';
@@ -653,23 +689,24 @@ document.addEventListener('keydown', e => {
       return;
     }
     // 选关模式
-    if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); playBGM(); return; }
-    if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); playBGM(); return; }
-    if (e.code === 'Digit3' || e.code === 'Numpad3') { loadLevel(3); playBGM(); return; }
-    if (e.code === 'Digit4' || e.code === 'Numpad4') { loadLevel(4); playBGM(); return; }
-    if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); playBGM(); return; }
-    if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; return; }
-    if (e.code === 'ArrowRight' || e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; return; }
-    if (e.code === 'Tab') { charSelect = (charSelect+1)%4; return; }
-    if (e.code === 'Backspace') { menuMode = 'main'; return; }
-    if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); playBGM(); return; }
+    if (e.code === 'Digit1' || e.code === 'Numpad1') { sfxConfirm(); loadLevel(1); playBGM(); return; }
+    if (e.code === 'Digit2' || e.code === 'Numpad2') { sfxConfirm(); loadLevel(2); playBGM(); return; }
+    if (e.code === 'Digit3' || e.code === 'Numpad3') { sfxConfirm(); loadLevel(3); playBGM(); return; }
+    if (e.code === 'Digit4' || e.code === 'Numpad4') { sfxConfirm(); loadLevel(4); playBGM(); return; }
+    if (e.code === 'Digit5' || e.code === 'Numpad5') { sfxConfirm(); loadLevel(5); playBGM(); return; }
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; sfxClick(); return; }
+    if (e.code === 'ArrowRight' || e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; sfxClick(); return; }
+    if (e.code === 'Tab') { charSelect = (charSelect+1)%4; sfxClick(); return; }
+    if (e.code === 'Backspace') { menuMode = 'main'; sfxBack(); return; }
+    if (e.code === 'Enter' || e.code === 'Space') { sfxConfirm(); loadLevel(menuSelection); playBGM(); return; }
   }
   // 胜利菜单控制
   if (gameState === 'win') {
     if (e.code === 'Enter' || e.code === 'Space') {
+      sfxConfirm();
       if (currentLevel < Object.keys(LEVELS).length) { loadLevel(currentLevel+1); return; }
     }
-    if (e.code === 'Backspace') { gameState = 'menu'; setBodyState(); document.getElementById('msg').style.opacity = '0'; return; }
+    if (e.code === 'Backspace') { sfxBack(); gameState = 'menu'; setBodyState(); document.getElementById('msg').style.opacity = '0'; return; }
   }
   if (e.code === 'KeyR' && (gameState === 'dead' || gameState === 'gameover')) resetLevel();
 });
@@ -741,8 +778,10 @@ function updateSettingsSel() {
 }
 // 绑定鼠标点击
 document.querySelectorAll('#settings-panel .opt').forEach((btn, idx) => {
+  btn.addEventListener('mouseenter', () => sfxClick());
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    sfxConfirm();
     settingsSelection = idx;
     handleSettingsAct(btn.dataset.act);
   });
@@ -766,6 +805,7 @@ function openAudioSettings() {
   if (sfxVal) sfxVal.textContent = Math.round(sfxVolume * 100) + '%';
 }
 function closeAudioSettings() {
+  sfxConfirm();
   gameState = prevGameState || 'menu';
   prevGameState = '';
   setBodyState();
@@ -1650,12 +1690,7 @@ function draw() {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.fillText('↑ ↓ 切换  ·  Enter 确认', CANVAS_W / 2, btnY1 + btnH + 14);
     } else {
-      // 选关模式提示
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = '11px -apple-system';
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillText('← ↑ ↓ → 选关  ·  Enter 进入  ·  Backspace 返回', CANVAS_W / 2, cardsBaseY + 165);
+      // 选关模式提示（统一由下方底部操作提示绘制，避免重复）
     }
     // 不同关卡用不同色调
     const levelColors = [
@@ -1767,8 +1802,11 @@ function draw() {
 
     // ── 底部操作提示 ──
     ctx.font = '13px -apple-system'; ctx.fillStyle = '#ff0';
-    const hintY = cardsBaseY + cardH + 40;
+    // 提示位置：放在关卡卡片和踏步角色之间（卡片 y=350 底，踏步 y=388 顶），用 y=370
+    const hintY = cardsBaseY + cardH + 20;
     if (menuMode === 'level') {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillStyle = '#fff'; ctx.font = '12px -apple-system';
       ctx.fillText('← ↑ ↓ → 选关  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关  ·  Backspace 返回', CANVAS_W/2, hintY);
     }
@@ -2052,6 +2090,19 @@ function loop(ts) {
   requestAnimationFrame(loop);  // 始终调用，永不停止
 }
 requestAnimationFrame(loop);
+
+// 页面加载后尝试启动 BGM（被自动播放策略挡住则等用户首次交互）
+playBGM();
+// 任意点击/按键时尝试（被自动播放策略挡住时重试）
+try {
+  ['click','keydown','touchstart','mousedown','pointerdown'].forEach(ev => {
+    document.addEventListener(ev, () => playBGM(), {passive:true, once:false});
+  });
+} catch(e) {}
+// audio 加载就绪后自动尝试播放（针对初次加载时机问题）
+setTimeout(() => playBGM(), 200);
+setTimeout(() => playBGM(), 1000);
+setTimeout(() => playBGM(), 3000);
 </script>
 </body>
 </html>
