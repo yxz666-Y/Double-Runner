@@ -115,6 +115,8 @@ const LEVELS = {
   },
 };
 
+const totalLevels = Object.keys(LEVELS).length;
+
 // 运行时关卡数据（由 loadLevel 填充）
 let LEVEL_W = 1500;
 let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
@@ -156,7 +158,11 @@ document.addEventListener('keydown', e => {
   if (gameState === 'menu') {
     if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); return; }
     if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); return; }
-    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { menuSelection = menuSelection===1?2:1; return; }
+    if (e.code === 'Digit3' || e.code === 'Numpad3') { loadLevel(3); return; }
+    if (e.code === 'Digit4' || e.code === 'Numpad4') { loadLevel(4); return; }
+    if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); return; }
+    if (e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; return; }
+    if (e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; return; }
     if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); return; }
   }
   // 胜利菜单控制
