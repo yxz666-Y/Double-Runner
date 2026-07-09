@@ -16,7 +16,7 @@ canvas{display:block;border:1px solid #333}
 <body>
 <div id="hud">
   <span id="p1">P1: A/D 移动 | W 二段跳</span>
-  <span id="p2">P2: ↑ 跳 | ↓ 下落 | ←→ 冲刺</span>
+  <span id="p2">P2: ↑ 跳 | ↓ 射击 | ←→ 冲刺</span>
   <span>❤️ x<b id="lives">3</b></span>
   <span>🪙 <b id="coins">0</b></span>
   <span>👤 P1+P2</span>
@@ -34,7 +34,6 @@ const GRAVITY      = 0.55;   // 重力加速度（px/frame²）
 const JUMP_V       = -9.0;   // 一段跳初速度
 const DOUBLE_JUMP_V= -7.5;   // 二段跳初速度
 const MOVE_SPEED   = 3.5;    // 水平移速（px/frame）
-const FAST_FALL    = 0.6;    // 快速下落额外加速度
 const DASH_SPEED   = 9;      // 冲刺速度
 const DASH_DURATION= 8;      // 冲刺持续帧数
 const DASH_COOLDOWN= 60;     // 冲刺冷却帧数
@@ -42,6 +41,10 @@ const DJ_WINDOW    = 30;     // 二段跳时间窗（帧数，约500ms@60fps）
 const DASH_WINDOW  = 15;     // 冲刺就绪窗（P1按A/D后P2有15帧时间按箭头）
 const GROUND_Y     = 430;    // 地面 y 坐标
 const CHAR_W = 28, CHAR_H = 38; // 角色尺寸
+const MONSTER_W = 32, MONSTER_H = 28;        // 怪兽尺寸
+const ENEMY_BULLET_SPEED = 4.0;              // 怪兽弹幕速度
+const MONSTER_DMG = 1;                       // 怪兽碰撞伤害（扣心数）
+const BULLET_SPEED = 8;                      // 玩家子弹速度
 
 /* ============================================
  * 画布
@@ -86,6 +89,7 @@ function sfxDash()    { playTone(300, 0.08, 'sawtooth', 0.6); playTone(200, 0.15
 function sfxCoin()    { playTone(880, 0.08, 'sine', 1); setTimeout(()=>playTone(1200,0.1,'sine',0.8),80); }
 function sfxDie()     { playTone(400, 0.15, 'sawtooth', 0.8); setTimeout(()=>playTone(200,0.2,'sawtooth',0.6),120); }
 function sfxWin()     { [0,100,200,300].forEach((d,i)=>setTimeout(()=>playTone(660+i*110,0.2,'sine',1),d)); }
+function sfxShoot()   { playTone(800, 0.05, 'square', 0.4); playTone(1200, 0.04, 'sawtooth', 0.3); }
 function sfxBump()    { playTone(180, 0.08, 'square', 0.5); }
 function sfxPause()   { playTone(440, 0.06, 'sine', 0.6); setTimeout(()=>playTone(330,0.06,'sine',0.5),80); }
 
@@ -143,16 +147,45 @@ const LEVELS = {
     coins: [{x:200,y:380},{x:230,y:380},{x:740,y:360},{x:770,y:360},{x:950,y:330},{x:980,y:330},{x:1070,y:270},{x:1090,y:270},{x:1400,y:340},{x:1420,y:340},{x:1620,y:380},{x:1650,y:380},{x:1730,y:360},{x:2020,y:380},{x:2050,y:380},{x:2080,y:380}],
     flag: {x:2120,y:GROUND_Y-80,w:10,h:80},
   },
+  3: {
+    name: '第三关 · 极限', width: 3000,
+    grounds: [{x:0,y:GROUND_Y,w:600,h:70},{x:760,y:GROUND_Y,w:380,h:70},{x:1280,y:GROUND_Y,w:360,h:70},{x:1780,y:GROUND_Y,w:320,h:70},{x:2240,y:GROUND_Y,w:760,h:70}],
+    platforms: [{x:620,y:380,w:140,h:16},{x:850,y:340,w:100,h:16},{x:1130,y:380,w:150,h:16},{x:1280,y:250,w:120,h:16},{x:1430,y:360,w:100,h:16},{x:1620,y:380,w:160,h:16},{x:1820,y:260,w:100,h:16},{x:2700,y:340,w:120,h:16}],
+    spikes: [{x:400,y:GROUND_Y-20,w:40,h:20},{x:1950,y:GROUND_Y-20,w:40,h:20},{x:2500,y:GROUND_Y-20,w:40,h:20}],
+    coins: [{x:200,y:380},{x:230,y:380},{x:680,y:360},{x:710,y:360},{x:870,y:200},{x:900,y:200},{x:1180,y:360},{x:1210,y:360},{x:1300,y:230},{x:1320,y:230},{x:1390,y:230},{x:1460,y:340},{x:1490,y:340},{x:1680,y:360},{x:1710,y:360},{x:1840,y:240},{x:1870,y:240},{x:2350,y:380},{x:2380,y:380},{x:2810,y:320},{x:2840,y:320},{x:2870,y:320}],
+    flag: {x:2920,y:GROUND_Y-80,w:10,h:80},
+  },
+  4: {
+    name: '第四关 · 猎魔', width: 3300,
+    monsters: [{x:800,y:GROUND_Y-MONSTER_H},{x:2400,y:GROUND_Y-MONSTER_H}],
+    grounds: [{x:0,y:GROUND_Y,w:600,h:70},{x:760,y:GROUND_Y,w:380,h:70},{x:1280,y:GROUND_Y,w:360,h:70},{x:1780,y:GROUND_Y,w:320,h:70},{x:2240,y:GROUND_Y,w:1060,h:70}],
+    platforms: [{x:620,y:380,w:160,h:16},{x:830,y:340,w:180,h:16},{x:1130,y:380,w:150,h:16},{x:1260,y:250,w:200,h:16},{x:1450,y:360,w:120,h:16},{x:1620,y:380,w:160,h:16},{x:1810,y:260,w:160,h:16},{x:2680,y:340,w:220,h:16}],
+    spikes: [{x:400,y:GROUND_Y-20,w:40,h:20},{x:1950,y:GROUND_Y-20,w:40,h:20},{x:2500,y:GROUND_Y-20,w:40,h:20}],
+    coins: [{x:160,y:380},{x:200,y:380},{x:160,y:350},{x:200,y:350},{x:680,y:360},{x:710,y:360},{x:880,y:200},{x:910,y:200},{x:1180,y:360},{x:1210,y:360},{x:1300,y:230},{x:1320,y:230},{x:1410,y:230},{x:1490,y:340},{x:1520,y:340},{x:1680,y:360},{x:1710,y:360},{x:1840,y:240},{x:1870,y:240},{x:2350,y:380},{x:2380,y:380},{x:2810,y:320},{x:2840,y:320},{x:2870,y:320}],
+    flag: {x:3220,y:GROUND_Y-80,w:10,h:80},
+  },
+  5: {
+    name: '第五关 · 攻防战', width: 3400,
+    monsters: [{x:1080,y:GROUND_Y-MONSTER_H},{x:1520,y:GROUND_Y-MONSTER_H},{x:2720,y:GROUND_Y-MONSTER_H}],
+    grounds: [{x:0,y:GROUND_Y,w:580,h:70},{x:760,y:GROUND_Y,w:400,h:70},{x:1300,y:GROUND_Y,w:360,h:70},{x:1800,y:GROUND_Y,w:320,h:70},{x:2260,y:GROUND_Y,w:1140,h:70}],
+    platforms: [{x:620,y:380,w:160,h:16},{x:850,y:340,w:180,h:16},{x:1150,y:380,w:150,h:16},{x:1280,y:250,w:200,h:16},{x:1470,y:360,w:120,h:16},{x:1640,y:380,w:160,h:16},{x:1820,y:260,w:160,h:16}],
+    spikes: [{x:400,y:GROUND_Y-20,w:40,h:20},{x:1950,y:GROUND_Y-20,w:40,h:20},{x:2500,y:GROUND_Y-20,w:40,h:20}],
+    coins: [{x:160,y:380},{x:200,y:380},{x:680,y:360},{x:710,y:360},{x:880,y:200},{x:910,y:200},{x:1180,y:360},{x:1210,y:360},{x:1300,y:230},{x:1320,y:230},{x:1500,y:340},{x:1530,y:340},{x:1680,y:360},{x:1710,y:360},{x:1840,y:240},{x:1870,y:240},{x:2350,y:380},{x:2380,y:380},{x:2810,y:320},{x:2840,y:320},{x:2870,y:320}],
+    flag: {x:3320,y:GROUND_Y-80,w:10,h:80},
+  },
 };
+
+const totalLevels = Object.keys(LEVELS).length;
 
 // 运行时关卡数据（由 loadLevel 填充）
 let LEVEL_W = 1500;
-let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [];
+let GROUNDS = [], PLATFORMS = [], SPIKES = [], COINS = [], MONSTERS = [];
 let FLAG = {x:0,y:0,w:0,h:0};
 let currentLevel = 1;
 let menuSelection = 1;
 let levelTimer = 0;
 let finalScore = 0;
+let monsterKills = 0;
 let highScores = {};
 // 加载最高分
 try { highScores = JSON.parse(localStorage.getItem('duoRunnerHighScores')) || {}; } catch(e) {}
@@ -164,6 +197,7 @@ function loadLevel(id) {
   PLATFORMS = lv.platforms.map(o => ({...o, type:'platform'}));
   SPIKES = lv.spikes.map(o => ({...o}));
   COINS = lv.coins.map(o => ({...o}));
+  MONSTERS = (lv.monsters || []).map(o => ({...o, alive:true, squashT:0, dir:-1, attackCD:180+Math.floor(Math.random()*80)}));
   FLAG = {...lv.flag};
   LEVEL_W = lv.width;
   currentLevel = id;
@@ -171,7 +205,7 @@ function loadLevel(id) {
   if (tag) tag.textContent = '第 ' + id + ' 关';
   player.x = 60; player.y = GROUND_Y - CHAR_H - 10;
   player.vx = 0; player.vy = 0; player.jumpsUsed = 0; player.onGround = false;
-  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0;
+  cameraX = 0; lives = 3; coinsCollected = 0; deaths = 0; levelTimer = 0; monsterKills = 0;
   gameState = 'playing';
 }
 
@@ -188,7 +222,11 @@ document.addEventListener('keydown', e => {
   if (gameState === 'menu') {
     if (e.code === 'Digit1' || e.code === 'Numpad1') { loadLevel(1); return; }
     if (e.code === 'Digit2' || e.code === 'Numpad2') { loadLevel(2); return; }
-    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { menuSelection = menuSelection===1?2:1; return; }
+    if (e.code === 'Digit3' || e.code === 'Numpad3') { loadLevel(3); return; }
+    if (e.code === 'Digit4' || e.code === 'Numpad4') { loadLevel(4); return; }
+    if (e.code === 'Digit5' || e.code === 'Numpad5') { loadLevel(5); return; }
+    if (e.code === 'ArrowUp') { menuSelection = menuSelection>1 ? menuSelection-1 : totalLevels; return; }
+    if (e.code === 'ArrowDown') { menuSelection = menuSelection<totalLevels ? menuSelection+1 : 1; return; }
     if (e.code === 'Enter' || e.code === 'Space') { loadLevel(menuSelection); playBGM(); return; }
   }
   // 胜利菜单控制
@@ -228,6 +266,7 @@ function spawnParticles(x, y, color, count) {
  * 更新
  * ============================================ */
 function update() {
+  try {
   if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
     if (keys['Enter']) { gameState = 'playing'; keys['Enter'] = false; }
@@ -317,10 +356,16 @@ function update() {
   keys._prevArrowLeft  = keys['ArrowLeft'];
   keys._prevArrowRight = keys['ArrowRight'];
 
-  /* === P2: ↓ 快速下落 === */
-  if (keys['ArrowDown'] && !player.onGround) {
-    player.vy += FAST_FALL;
+  /* === P2: ↓ 射击 === */
+  if (keys['ArrowDown'] && !keys._shotFired) {
+    keys._shotFired = true;
+    const bulletDir = player.dir || 1;
+    const bx = player.x + CHAR_W/2 + bulletDir*10;
+    const by = player.y + CHAR_H/2;
+    particles.push({x:bx, y:by, vx:bulletDir*BULLET_SPEED, vy:0, life:60, size:4, color:'#ff0', isPlayerBullet:true, isBullet:true});
+    sfxShoot();
   }
+  if (!keys['ArrowDown']) keys._shotFired = false;
 
   /* === 无敌帧倒计时 === */
   if (invincibleTimer > 0) invincibleTimer--;
@@ -398,13 +443,14 @@ function update() {
     const timeBonus = Math.max(0, 500 - seconds * 5);
     const coinBonus = coinsCollected * 50;
     const deathPenalty = deaths * 200;
-    finalScore = 1000 + timeBonus + coinBonus - deathPenalty;
+    const killBonus = monsterKills * 300;
+    finalScore = 1000 + timeBonus + coinBonus + killBonus - deathPenalty;
     if (finalScore < 0) finalScore = 0;
     // 更新最高分
     const prev = highScores[currentLevel] || 0;
     if (finalScore > prev) { highScores[currentLevel] = finalScore; localStorage.setItem('duoRunnerHighScores', JSON.stringify(highScores)); }
     const hasNext = currentLevel < Object.keys(LEVELS).length;
-    showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  💀 '+deaths+
+    showMsg('🎉 通关！ 得分: '+finalScore+'\n⏱ '+seconds+'s  🪙 '+coinsCollected+'  👾 '+monsterKills+'  💀 '+deaths+
       '\n'+(hasNext?'Enter 下一关  ·  Backspace 回菜单':'Backspace 回菜单'), false);
   }
 
@@ -413,16 +459,86 @@ function update() {
   if (cameraX < 0) cameraX = 0;
   if (cameraX > LEVEL_W - CANVAS_W) cameraX = LEVEL_W - CANVAS_W;
 
+  /* ---- 子弹命中怪兽 ---- */
+  for (let i=particles.length-1; i>=0; i--) {
+    const b = particles[i];
+    if (!b.isPlayerBullet) continue;
+    for (const m of MONSTERS) {
+      if (!m.alive) continue;
+      if (b.x > m.x && b.x < m.x+MONSTER_W && b.y > m.y && b.y < m.y+MONSTER_H) {
+        m.alive = false; m.squashT = 40;
+        particles.splice(i,1);
+        spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#7c3aed', 14);
+        spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#fff', 6);
+        break;
+      }
+    }
+  }
+
+  /* ---- 怪物更新（平台巡逻） ---- */
+  for (const m of MONSTERS) {
+    if (!m.alive) { if (m.squashT > 0) m.squashT--; continue; }
+    // 初始化：找到怪物脚下的平台，设置巡逻边界
+    if (!m._init) { m._init = true; m.patrolDir = 1;
+      for (const g of [...GROUNDS, ...PLATFORMS]) {
+        if (m.x+MONSTER_W/2 > g.x && m.x+MONSTER_W/2 < g.x+g.w &&
+            m.y+MONSTER_H >= g.y && m.y+MONSTER_H <= g.y+16) {
+          m.patrolL = g.x + 8; m.patrolR = g.x+g.w - MONSTER_W - 8; break;
+        }
+      }
+      if (!m.patrolL) { m.patrolL = m.x - 60; m.patrolR = m.x + 60; }
+    }
+    // 巡逻移动
+    m.x += m.patrolDir * 1.5; m.dir = m.patrolDir;
+    // 到达边界→转向
+    if (m.x <= m.patrolL || m.x >= m.patrolR) m.patrolDir *= -1;
+    // 确保脚在平台上（边缘检测兜底）
+    let onPlat = false;
+    for (const g of [...GROUNDS, ...PLATFORMS]) {
+      if (m.x+MONSTER_W/2 > g.x && m.x+MONSTER_W/2 < g.x+g.w &&
+          m.y+MONSTER_H >= g.y && m.y+MONSTER_H <= g.y+16) { onPlat = true; break; }
+    }
+    if (!onPlat) m.patrolDir *= -1;
+
+    // 攻击CD（发现玩家在视野内时射击）
+    const dx = player.x - m.x;
+    m.attackCD--;
+    if (m.attackCD <= 0 && Math.abs(dx) < 400) {
+      m.attackCD = 180 + Math.floor(Math.random()*80);
+      const bDir = dx > 0 ? 1 : -1;
+      particles.push({x:m.x+MONSTER_W/2, y:m.y+MONSTER_H/2, vx:bDir*ENEMY_BULLET_SPEED, vy:0, life:120, size:5, color:'#f44', isBullet:true});
+    }
+    // 碰撞玩家
+    if (player.x+CHAR_W > m.x && player.x < m.x+MONSTER_W &&
+        player.y+CHAR_H > m.y && player.y < m.y+MONSTER_H && invincibleTimer <= 0) {
+      die(false);
+    }
+  }
+
+  /* ---- 弹幕碰撞玩家（仅敌方子弹） ---- */
+  for (let i=particles.length-1; i>=0; i--) {
+    const b = particles[i];
+    if (!b.isBullet || b.isPlayerBullet) continue;
+    if (player.x+CHAR_W > b.x-4 && player.x < b.x+4 &&
+        player.y+CHAR_H > b.y-4 && player.y < b.y+4 && invincibleTimer <= 0) {
+      particles.splice(i,1);
+      die(false);
+    }
+  }
+
   /* ---- 粒子 ---- */
   for (let i=particles.length-1; i>=0; i--) {
     const p = particles[i];
-    p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life--;
+    p.x += p.vx; p.y += p.vy;
+    if (!p.isBullet && !p.isPlayerBullet) p.vy += 0.1;
+    p.life--;
     if (p.life <= 0) particles.splice(i,1);
   }
 
   /* ---- HUD ---- */
   document.getElementById('lives').textContent = lives;
   document.getElementById('coins').textContent = coinsCollected;
+  } catch(e) { window._err = e.message; gameState = 'menu'; }
 }
 
 let lastSafeX = 60, lastSafeY = GROUND_Y - CHAR_H - 10;
@@ -487,20 +603,30 @@ function draw() {
   // 开始菜单（含选关）
   if (gameState === 'menu') {
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system'; ctx.textAlign = 'center';
-    ctx.fillText('双人跑酷', CANVAS_W/2, 130);
-    ctx.font = '14px -apple-system'; ctx.fillStyle = '#aaa';
-    ctx.fillText('P1: A/D 移动 | P2: ↑ 跳跃  |  P1+2: 冲刺 & 二段跳', CANVAS_W/2, 180);
-    // 关卡选择
-    ctx.font = 'bold 18px -apple-system';
-    for (let i=1; i<=Object.keys(LEVELS).length; i++) {
-      ctx.fillStyle = i===menuSelection ? '#fd0' : '#888';
-      const hs = highScores[i] || 0;
-      ctx.fillText((i===menuSelection?'▶ ':'  ')+LEVELS[i].name + (hs?'  最高 '+hs:'  无记录'), CANVAS_W/2, 260+i*40);
-      ctx.font = 'bold 18px -apple-system';
+    ctx.textAlign = 'center';
+    // 计算总高度，居中分布
+    const rowH = 38, listW = 400;
+    const totalH = 70 + 20 + rowH*totalLevels + 30; // 标题+间距+列表+底部
+    const topOffset = (CANVAS_H - totalH) / 2;
+    // 标题
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 36px -apple-system';
+    ctx.fillText('双人跑酷', CANVAS_W/2, topOffset+36);
+    ctx.font = '12px -apple-system'; ctx.fillStyle = '#888';
+    ctx.fillText('P1: A/D移动+W二段跳  |  P2: ↑跳 ↓射击 ←→冲刺', CANVAS_W/2, topOffset+60);
+    // 关卡列表
+    const startY = topOffset + 90;
+    for (let i=1; i<=totalLevels; i++) {
+      const y = startY + (i-1)*rowH;
+      const sel = i===menuSelection;
+      if (sel) { ctx.fillStyle = 'rgba(255,200,0,0.12)'; ctx.fillRect(CANVAS_W/2-listW/2, y-15, listW, 30); }
+      ctx.font = sel?'bold 16px -apple-system':'14px -apple-system';
+      ctx.fillStyle = sel?'#fd0':'#aaa';
+      const hs = highScores[i]||0;
+      ctx.fillText((sel?'▶ ':'  ')+'第'+i+'关  '+LEVELS[i].name+(hs?'  最高'+hs:'  无记录'), CANVAS_W/2, y);
     }
-    ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px -apple-system';
-    ctx.fillText('↑↓ 切换  ·  Enter 进入  ·  1/2 快速选关', CANVAS_W/2, 370);
+    ctx.font = '13px -apple-system'; ctx.fillStyle = '#ff0';
+    ctx.fillText('↑↓ 选择  ·  Enter 进入  ·  1-'+totalLevels+' 快速选关', CANVAS_W/2, startY+totalLevels*rowH+30);
+    if (window._err) { ctx.fillStyle='#f44'; ctx.font='12px monospace'; ctx.fillText('错误: '+window._err, CANVAS_W/2, startY+totalLevels*rowH+50); }
     ctx.textAlign = 'left'; return;
   }
 
@@ -587,6 +713,22 @@ function draw() {
   ctx.fillStyle = '#48c848'; ctx.fillRect(FLAG.x-2, FLAG.y+4+flagWave, 32, 18);
   ctx.fillStyle = '#fff'; ctx.fillRect(FLAG.x+2, FLAG.y+8+flagWave, 16, 8);
   ctx.fillStyle = '#fd0'; ctx.beginPath(); ctx.arc(FLAG.x+6, FLAG.y, 8, 0, Math.PI*2); ctx.fill();
+
+  /* ---- 怪物 ---- */
+  for (const m of MONSTERS) {
+    if (!m.alive && m.squashT <= 0) continue;
+    const mx=m.x, my=m.y, alpha = m.alive?1:0.5;
+    ctx.globalAlpha = alpha;
+    // 身体
+    ctx.fillStyle = '#7c3aed'; ctx.fillRect(mx+2, my+6, MONSTER_W-4, MONSTER_H-8);
+    ctx.fillStyle = '#a78bfa'; ctx.fillRect(mx+4, my+8, MONSTER_W-8, 6);
+    // 眼睛
+    ctx.fillStyle = '#fff'; ctx.fillRect(mx+6, my+10, 6, 6); ctx.fillRect(mx+MONSTER_W-12, my+10, 6, 6);
+    ctx.fillStyle = '#000'; ctx.fillRect(m.dir>0?mx+8:mx+6, my+12, 3, 3); ctx.fillRect(m.dir>0?mx+MONSTER_W-10:mx+MONSTER_W-12, my+12, 3, 3);
+    // 脚
+    ctx.fillStyle = '#5b21b6'; ctx.fillRect(mx+4, my+MONSTER_H-6, 8, 6); ctx.fillRect(mx+MONSTER_W-12, my+MONSTER_H-6, 8, 6);
+    ctx.globalAlpha = 1;
+  }
 
   /* ---- 冲刺残影 ---- */
   if (dashTimer > 0) {
