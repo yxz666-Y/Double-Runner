@@ -102,7 +102,7 @@ const LEVELS = {
   },
   4: {
     name: '第四关 · 猎魔', width: 3300,
-    monsters: [{x:1170,y:GROUND_Y-MONSTER_H},{x:2620,y:GROUND_Y-MONSTER_H}],
+    monsters: [{x:800,y:GROUND_Y-MONSTER_H},{x:2400,y:GROUND_Y-MONSTER_H}],
     grounds: [{x:0,y:GROUND_Y,w:600,h:70},{x:760,y:GROUND_Y,w:380,h:70},{x:1280,y:GROUND_Y,w:360,h:70},{x:1780,y:GROUND_Y,w:320,h:70},{x:2240,y:GROUND_Y,w:1060,h:70}],
     platforms: [{x:620,y:380,w:160,h:16},{x:830,y:340,w:180,h:16},{x:1130,y:380,w:150,h:16},{x:1260,y:250,w:200,h:16},{x:1450,y:360,w:120,h:16},{x:1620,y:380,w:160,h:16},{x:1810,y:260,w:160,h:16},{x:2680,y:340,w:220,h:16}],
     spikes: [{x:400,y:GROUND_Y-20,w:40,h:20},{x:1950,y:GROUND_Y-20,w:40,h:20},{x:2500,y:GROUND_Y-20,w:40,h:20}],
@@ -413,25 +413,27 @@ function update() {
   /* ---- 怪物更新（平台巡逻） ---- */
   for (const m of MONSTERS) {
     if (!m.alive) { if (m.squashT > 0) m.squashT--; continue; }
-    // 初始化巡逻参数
-    if (!m.patrolDir) m.patrolDir = 1;
-    if (!m.patrolCenter) m.patrolCenter = m.x;
-    if (!m.patrolRange) m.patrolRange = 80;
-    // 巡逻移动
-    m.x += m.patrolDir * 1.5;
-    m.dir = m.patrolDir;
-    // 到达巡逻边界→转向
-    if (Math.abs(m.x - m.patrolCenter) > m.patrolRange) {
-      m.patrolDir *= -1;
-    }
-    // 碰到平台边缘→转向
-    let onPlatform = false;
-    for (const g of GROUNDS) {
-      if (m.x > g.x && m.x+MONSTER_W < g.x+g.w && m.y+MONSTER_H >= g.y && m.y+MONSTER_H <= g.y+10) {
-        onPlatform = true; break;
+    // 初始化：找到怪物脚下的平台，设置巡逻边界
+    if (!m._init) { m._init = true; m.patrolDir = 1;
+      for (const g of [...GROUNDS, ...PLATFORMS]) {
+        if (m.x+MONSTER_W/2 > g.x && m.x+MONSTER_W/2 < g.x+g.w &&
+            m.y+MONSTER_H >= g.y && m.y+MONSTER_H <= g.y+16) {
+          m.patrolL = g.x + 8; m.patrolR = g.x+g.w - MONSTER_W - 8; break;
+        }
       }
+      if (!m.patrolL) { m.patrolL = m.x - 60; m.patrolR = m.x + 60; }
     }
-    if (!onPlatform) m.patrolDir *= -1;
+    // 巡逻移动
+    m.x += m.patrolDir * 1.5; m.dir = m.patrolDir;
+    // 到达边界→转向
+    if (m.x <= m.patrolL || m.x >= m.patrolR) m.patrolDir *= -1;
+    // 确保脚在平台上（边缘检测兜底）
+    let onPlat = false;
+    for (const g of [...GROUNDS, ...PLATFORMS]) {
+      if (m.x+MONSTER_W/2 > g.x && m.x+MONSTER_W/2 < g.x+g.w &&
+          m.y+MONSTER_H >= g.y && m.y+MONSTER_H <= g.y+16) { onPlat = true; break; }
+    }
+    if (!onPlat) m.patrolDir *= -1;
 
     // 攻击CD（发现玩家在视野内时射击）
     const dx = player.x - m.x;
