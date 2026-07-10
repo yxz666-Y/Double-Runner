@@ -132,28 +132,32 @@ let gameState = 'menu'; // menu | playing | win | dead | gameover | settings
 let deadTimer = 0, winTimer = 0;
 let particles = [];
 
-// 背景小鸟
+// 背景海鸥
 const BIRDS = [
-  {x:100, y:80,  spd:0.6, bob:0},
-  {x:400, y:120, spd:0.9, bob:1.2},
-  {x:700, y:65,  spd:0.7, bob:2.5},
-  {x:200, y:150, spd:1.1, bob:1.8},
-  {x:550, y:95,  spd:0.8, bob:3.0},
+  {x:100, y:70,  spd:0.5, bob:0},
+  {x:420, y:110, spd:0.75,bob:1.2},
+  {x:700, y:55,  spd:0.6, bob:2.5},
+  {x:200, y:140, spd:0.9, bob:1.8},
+  {x:560, y:85,  spd:0.65,bob:3.0},
 ];
-// 像素小鸟精灵（10×6 格，每格 2px）
+// 海鸥精灵（14×7 格，每格 2px → 28×14 屏显）
+// 调色板: W白 G灰 K深灰 Y橙喙
+const BIRD_PAL = {W:'#fff', G:'#bbb', K:'#555', Y:'#f90'};
 const BIRD_SPRITES = [
   // 帧0：翅膀向上（V形）
-  ['  ██    ',' ████  ','██████ ','  ██   ','  ████ '],
-  // 帧1：翅膀平展
-  ['  ██    ',' █  █  ','██ ████','  ██   ','  ████ '],
+  ['     WW      ','   WWGGWW    ',' WWGGKKGGWW  ','   WWGGWW    ','     WW      ','     YY      ','   WW  WW    '],
+  // 帧1：翅膀平展（滑翔）
+  ['     WW      ','   WW  WW    ','KKGG    GGKK ','   WWGGGGWW  ','     WW      ','     YY      ','   WW  WW    '],
 ];
 
 function drawPixelBird(x, y, frame) {
   const s = BIRD_SPRITES[frame % 2];
   for (let row = 0; row < s.length; row++) {
     for (let col = 0; col < s[row].length; col++) {
-      if (s[row][col] === '█') {
-        ctx.fillStyle = '#2a2a3a';
+      const ch = s[row][col];
+      const c = BIRD_PAL[ch];
+      if (c) {
+        ctx.fillStyle = c;
         ctx.fillRect(x + col * 2, y + row * 2, 2, 2);
       }
     }
@@ -919,6 +923,15 @@ function update() {
   // 设置面板打开时：完全暂停（不计时、不更新物理）
   if (gameState === 'settings') return;
   if (gameState === 'audiosettings') return;
+
+  // 背景海鸥（所有非设置界面都更新）
+  const birdLoopW = (gameState === 'menu') ? CANVAS_W : LEVEL_W;
+  for (const b of BIRDS) {
+    b.x += b.spd;
+    b.bob += 0.03;
+    if (b.x > birdLoopW + 60) b.x = -60;
+  }
+
   if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
     if (keys['Enter']) { keys['Enter'] = false; }
@@ -1211,13 +1224,6 @@ function update() {
     if (p.life <= 0) particles.splice(i,1);
   }
 
-  /* ---- 背景小鸟 ---- */
-  for (const b of BIRDS) {
-    b.x += b.spd;
-    b.bob += 0.03;
-    if (b.x > LEVEL_W + 40) b.x = -40;
-  }
-
   /* ---- HUD ---- */
   document.getElementById('lives').textContent = lives;
   document.getElementById('coins').textContent = coinsCollected;
@@ -1449,6 +1455,16 @@ function draw() {
       ctx.fillRect(x + 12, y - 10, 56, 20);
       ctx.fillRect(x + 24, y - 16, 32, 16);
       ctx.fillRect(x + 44, y - 6, 28, 14);
+    }
+    // 海鸥（菜单天空飞行，按屏幕宽度循环包裹）
+    for (const b of BIRDS) {
+      let bx = b.x % (CANVAS_W + 120);
+      if (bx < -60) bx += CANVAS_W + 120;
+      const by = b.y + Math.sin(b.bob) * 6;
+      const frame = Math.floor(Date.now() / 280 + b.x) % 2;
+      if (bx > -40 && bx < CANVAS_W + 40) {
+        drawPixelBird(bx, by, frame);
+      }
     }
     // 远山（回到之前的视差漂移）
     const mountainT = Date.now() / 50; // 50ms 走 1 像素
