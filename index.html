@@ -1113,6 +1113,7 @@ function update() {
       if (!m.alive) continue;
       if (b.x > m.x && b.x < m.x+MONSTER_W && b.y > m.y && b.y < m.y+MONSTER_H) {
         m.alive = false; m.squashT = 40;
+        monsterKills++;
         particles.splice(i,1);
         spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#7c3aed', 14);
         spawnParticles(m.x+MONSTER_W/2, m.y+MONSTER_H/2, '#fff', 6);
