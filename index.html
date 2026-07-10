@@ -131,6 +131,35 @@ let lives = 3, coinsCollected = 0, deaths = 0;
 let gameState = 'menu'; // menu | playing | win | dead | gameover | settings
 let deadTimer = 0, winTimer = 0;
 let particles = [];
+
+// 背景小鸟
+const BIRDS = [
+  {x:100, y:80,  spd:0.6, bob:0},
+  {x:400, y:120, spd:0.9, bob:1.2},
+  {x:700, y:65,  spd:0.7, bob:2.5},
+  {x:200, y:150, spd:1.1, bob:1.8},
+  {x:550, y:95,  spd:0.8, bob:3.0},
+];
+// 像素小鸟精灵（10×6 格，每格 2px）
+const BIRD_SPRITES = [
+  // 帧0：翅膀向上（V形）
+  ['  ██    ',' ████  ','██████ ','  ██   ','  ████ '],
+  // 帧1：翅膀平展
+  ['  ██    ',' █  █  ','██ ████','  ██   ','  ████ '],
+];
+
+function drawPixelBird(x, y, frame) {
+  const s = BIRD_SPRITES[frame % 2];
+  for (let row = 0; row < s.length; row++) {
+    for (let col = 0; col < s[row].length; col++) {
+      if (s[row][col] === '█') {
+        ctx.fillStyle = '#2a2a3a';
+        ctx.fillRect(x + col * 2, y + row * 2, 2, 2);
+      }
+    }
+  }
+}
+
 let prevGameState = ''; // 记录打开设置前的状态
 let settingsSelection = 0; // 0=继续 1=重新开始 2=回到主页
 
@@ -1182,6 +1211,13 @@ function update() {
     if (p.life <= 0) particles.splice(i,1);
   }
 
+  /* ---- 背景小鸟 ---- */
+  for (const b of BIRDS) {
+    b.x += b.spd;
+    b.bob += 0.03;
+    if (b.x > LEVEL_W + 40) b.x = -40;
+  }
+
   /* ---- HUD ---- */
   document.getElementById('lives').textContent = lives;
   document.getElementById('coins').textContent = coinsCollected;
@@ -1842,6 +1878,16 @@ function draw() {
     const cy = 40 + ((cx*7)%60);
     ctx.fillRect(cx,cy,40,16); ctx.fillRect(cx+12,cy-10,56,20); ctx.fillRect(cx+24,cy-16,32,16);
     ctx.fillRect(cx+44,cy-6,28,14);
+  }
+  // 像素小鸟（在云和山之间）
+  for (const b of BIRDS) {
+    const bx = b.x - cameraX * 0.3; // 视差：比地面慢
+    const by = b.y + Math.sin(b.bob) * 6;
+    const frame = Math.floor(Date.now() / 280 + b.x) % 2;
+    // 只绘制屏幕内的鸟
+    if (bx > -30 && bx < CANVAS_W + 30) {
+      drawPixelBird(bx, by, frame);
+    }
   }
   // 远山
   for (let hx = (cameraX-cameraX%160)-80; hx < cameraX+CANVAS_W+160; hx += 160) {
