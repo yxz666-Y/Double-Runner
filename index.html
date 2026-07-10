@@ -140,14 +140,14 @@ const BIRDS = [
   {x:200, y:140, spd:0.9, bob:1.8},
   {x:560, y:85,  spd:0.65,bob:3.0},
 ];
-// 海鸥精灵（14×6 格，每格 2px → 28×12 屏显，侧视向右飞行，细身+翅膀识别）
+// 海鸥精灵（12×6 格，每格 2px → 24×12 屏显，侧视向右）
 // 调色板: W白 G灰 K深灰 Y橙喙
 const BIRD_PAL = {W:'#fff', G:'#bbb', K:'#555', Y:'#f90'};
 const BIRD_SPRITES = [
-  // 帧0：翅膀向上（V形拍翅）
-  ['     K  K     ','    GGGGGG    ','   GG    GG   ','  WWWWWWWWWW  ',' WW        WW ','            YY'],
-  // 帧1：翅膀平展（滑翔）
-  ['              ','KK          KK','GGGGGGGGGGGGGG','  WWWWWWWWWW  ',' WW        WW ','            YY'],
+  // 帧0：翅膀向上V形
+  ['   GG  GG   ','  GG    GG  ',' GG      GG ','  WWWWWWWW  ',' WW  WW  WW ','          YY'],
+  // 帧1：翅膀平展滑翔
+  ['            ','GG        GG','GGGGGGGGGGGG','  WWWWWWWW  ',' WW  WW  WW ','          YY'],
 ];
 
 function drawPixelBird(x, y, frame) {
