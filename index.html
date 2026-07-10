@@ -1048,6 +1048,12 @@ function update() {
     if (player.x+CHAR_W <= s.x || player.x >= s.x+s.w) continue;
     if (player.vx > 0) player.x = s.x - CHAR_W;
     else if (player.vx < 0) player.x = s.x + s.w;
+    // 冲刺中撞墙：立即停止冲刺，防止反复推回→卡下悬崖
+    if (dashTimer > 0) {
+      dashTimer = 0;
+      sfxBump();
+      spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#fff', 8);
+    }
   }
 
   /* ---- 记录安全位置 ---- */
