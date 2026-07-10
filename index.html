@@ -158,16 +158,16 @@ function drawPixelBird(x, y, frame) {
 
 // 程序化海鸥：按固定间距覆盖全关卡，用索引派生Y/相位/飘移
 function drawBirdsInView(viewLeft, viewRight, parallax) {
-  const SPACING = 320;
+  const SPACING = 380;
   const sx0 = Math.floor(viewLeft / SPACING) * SPACING;
   for (let bx = sx0 - SPACING; bx < viewRight + SPACING; bx += SPACING) {
     const idx = Math.round(bx / SPACING);
-    const by = 60 + ((idx * 137 + 50) % 90);
+    const by = 60 + (((idx * 137 + 50) % 90) + 90) % 90; // 确保正数
     const frame = Math.floor(Date.now() / 280 + idx * 0.7) % 2;
-    const drift = ((Date.now() * 0.02 + idx * 73) % SPACING);
+    const drift = ((Date.now() * 0.02 + idx * 73) % SPACING + SPACING) % SPACING;
     const sx = bx + drift;
-    if (sx > viewLeft - 50 && sx < viewRight + SPACING + 50) {
-      const screenX = parallax ? (sx - viewLeft) : sx;
+    const screenX = parallax ? (sx - viewLeft) : sx;
+    if (screenX > -60 && screenX < CANVAS_W + 60) {
       drawPixelBird(screenX, by + Math.sin(Date.now()/1200 + idx) * 5, frame);
     }
   }
@@ -1889,7 +1889,7 @@ function draw() {
     ctx.fillRect(cx+44,cy-6,28,14);
   }
   // 海鸥（程序化生成，覆盖全关卡）
-  drawBirdsInView(cameraX * 0.3, (cameraX + CANVAS_W) * 0.3, true);
+  drawBirdsInView(cameraX * 0.3, cameraX * 0.3 + CANVAS_W, true);
   // 远山
   for (let hx = (cameraX-cameraX%160)-80; hx < cameraX+CANVAS_W+160; hx += 160) {
     ctx.fillStyle = '#68b838';
