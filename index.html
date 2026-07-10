@@ -156,20 +156,18 @@ function drawPixelBird(x, y, frame) {
   }
 }
 
-// 程序化海鸥：按固定间距覆盖全关卡，用索引派生Y/相位/飘移
-// offsetX: 画布translate偏移（游戏=cameraX，菜单=0）
-function drawBirdsInView(viewLeft, viewRight, parallax, offsetX) {
+// 程序化海鸥：固定世界坐标，覆盖全关卡，相机移动自然刷新
+function drawBirdsInView(worldLeft, worldRight) {
   const SPACING = 380;
-  const sx0 = Math.floor(viewLeft / SPACING) * SPACING;
-  for (let bx = sx0 - SPACING; bx < viewRight + SPACING; bx += SPACING) {
+  const sx0 = Math.floor(worldLeft / SPACING) * SPACING;
+  for (let bx = sx0 - SPACING; bx < worldRight + SPACING; bx += SPACING) {
     const idx = Math.round(bx / SPACING);
     const by = 60 + (((idx * 137 + 50) % 90) + 90) % 90;
     const frame = Math.floor(Date.now() / 280 + idx * 0.7) % 2;
     const drift = ((Date.now() * 0.02 + idx * 73) % SPACING + SPACING) % SPACING;
-    const sx = bx + drift;
-    const screenX = parallax ? (sx - viewLeft) : sx;
-    if (screenX > -60 && screenX < CANVAS_W + 60) {
-      drawPixelBird(screenX + offsetX, by + Math.sin(Date.now()/1200 + idx) * 5, frame);
+    const wx = bx + drift;
+    if (wx > worldLeft - 60 && wx < worldRight + 60) {
+      drawPixelBird(wx, by + Math.sin(Date.now()/1200 + idx) * 5, frame);
     }
   }
 }
@@ -1459,7 +1457,7 @@ function draw() {
       ctx.fillRect(x + 44, y - 6, 28, 14);
     }
     // 海鸥（程序化生成，覆盖全屏）
-    drawBirdsInView(0, CANVAS_W, false, 0);
+    drawBirdsInView(0, CANVAS_W);
     // 远山（回到之前的视差漂移）
     const mountainT = Date.now() / 50; // 50ms 走 1 像素
     const mountainOffset = (mountainT % 160); // 160px 周期
@@ -1890,7 +1888,7 @@ function draw() {
     ctx.fillRect(cx+44,cy-6,28,14);
   }
   // 海鸥（程序化生成，覆盖全关卡）
-  drawBirdsInView(cameraX * 0.3, cameraX * 0.3 + CANVAS_W, true, cameraX);
+  drawBirdsInView(cameraX, cameraX + CANVAS_W);
   // 远山
   for (let hx = (cameraX-cameraX%160)-80; hx < cameraX+CANVAS_W+160; hx += 160) {
     ctx.fillStyle = '#68b838';
