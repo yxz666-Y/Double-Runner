@@ -132,14 +132,6 @@ let gameState = 'menu'; // menu | playing | win | dead | gameover | settings
 let deadTimer = 0, winTimer = 0;
 let particles = [];
 
-// 背景海鸥
-const BIRDS = [
-  {x:100, y:70,  spd:0.5, bob:0},
-  {x:420, y:110, spd:0.75,bob:1.2},
-  {x:700, y:55,  spd:0.6, bob:2.5},
-  {x:200, y:140, spd:0.9, bob:1.8},
-  {x:560, y:85,  spd:0.65,bob:3.0},
-];
 // 海鸥精灵（12×6 格，每格 2px → 24×12 屏显，纯侧视向右）
 // 调色板: W白 G灰 K深灰/眼 Y橙喙
 const BIRD_PAL = {W:'#fff', G:'#bbb', K:'#333', Y:'#f90'};
@@ -160,6 +152,23 @@ function drawPixelBird(x, y, frame) {
         ctx.fillStyle = c;
         ctx.fillRect(x + col * 2, y + row * 2, 2, 2);
       }
+    }
+  }
+}
+
+// 程序化海鸥：按固定间距覆盖全关卡，用索引派生Y/相位/飘移
+function drawBirdsInView(viewLeft, viewRight, parallax) {
+  const SPACING = 320;
+  const sx0 = Math.floor(viewLeft / SPACING) * SPACING;
+  for (let bx = sx0 - SPACING; bx < viewRight + SPACING; bx += SPACING) {
+    const idx = Math.round(bx / SPACING);
+    const by = 60 + ((idx * 137 + 50) % 90);
+    const frame = Math.floor(Date.now() / 280 + idx * 0.7) % 2;
+    const drift = ((Date.now() * 0.02 + idx * 73) % SPACING);
+    const sx = bx + drift;
+    if (sx > viewLeft - 50 && sx < viewRight + SPACING + 50) {
+      const screenX = parallax ? (sx - viewLeft) : sx;
+      drawPixelBird(screenX, by + Math.sin(Date.now()/1200 + idx) * 5, frame);
     }
   }
 }
@@ -924,14 +933,6 @@ function update() {
   if (gameState === 'settings') return;
   if (gameState === 'audiosettings') return;
 
-  // 背景海鸥（所有非设置界面都更新）
-  const birdLoopW = (gameState === 'menu') ? CANVAS_W : LEVEL_W;
-  for (const b of BIRDS) {
-    b.x += b.spd;
-    b.bob += 0.03;
-    if (b.x > birdLoopW + 60) b.x = -60;
-  }
-
   if (gameState === 'playing') levelTimer++;
   if (gameState === 'menu') {
     if (keys['Enter']) { keys['Enter'] = false; }
@@ -1456,16 +1457,8 @@ function draw() {
       ctx.fillRect(x + 24, y - 16, 32, 16);
       ctx.fillRect(x + 44, y - 6, 28, 14);
     }
-    // 海鸥（菜单天空飞行，按屏幕宽度循环包裹）
-    for (const b of BIRDS) {
-      let bx = b.x % (CANVAS_W + 120);
-      if (bx < -60) bx += CANVAS_W + 120;
-      const by = b.y + Math.sin(b.bob) * 6;
-      const frame = Math.floor(Date.now() / 280 + b.x) % 2;
-      if (bx > -40 && bx < CANVAS_W + 40) {
-        drawPixelBird(bx, by, frame);
-      }
-    }
+    // 海鸥（程序化生成，覆盖全屏）
+    drawBirdsInView(0, CANVAS_W, false);
     // 远山（回到之前的视差漂移）
     const mountainT = Date.now() / 50; // 50ms 走 1 像素
     const mountainOffset = (mountainT % 160); // 160px 周期
@@ -1895,16 +1888,8 @@ function draw() {
     ctx.fillRect(cx,cy,40,16); ctx.fillRect(cx+12,cy-10,56,20); ctx.fillRect(cx+24,cy-16,32,16);
     ctx.fillRect(cx+44,cy-6,28,14);
   }
-  // 像素小鸟（在云和山之间）
-  for (const b of BIRDS) {
-    const bx = b.x - cameraX * 0.3; // 视差：比地面慢
-    const by = b.y + Math.sin(b.bob) * 6;
-    const frame = Math.floor(Date.now() / 280 + b.x) % 2;
-    // 只绘制屏幕内的鸟
-    if (bx > -30 && bx < CANVAS_W + 30) {
-      drawPixelBird(bx, by, frame);
-    }
-  }
+  // 海鸥（程序化生成，覆盖全关卡）
+  drawBirdsInView(cameraX * 0.3, (cameraX + CANVAS_W) * 0.3, true);
   // 远山
   for (let hx = (cameraX-cameraX%160)-80; hx < cameraX+CANVAS_W+160; hx += 160) {
     ctx.fillStyle = '#68b838';
