@@ -1197,6 +1197,16 @@ function die(fromFall) {
   lives--; deaths++;
   spawnParticles(player.x+CHAR_W/2, player.y+CHAR_H/2, '#f44', 30);
   document.getElementById('lives').textContent = lives;
+  // 非掉落死亡：在死亡位置附近找安全复活点，防止闪现回远处
+  if (!fromFall) {
+    for (const g of GROUNDS) {
+      if (player.x + CHAR_W/2 > g.x && player.x + CHAR_W/2 < g.x + g.w) {
+        lastSafeX = Math.max(g.x + 4, player.x - 60);
+        lastSafeY = g.y - CHAR_H;
+        break;
+      }
+    }
+  }
 
   if (lives <= 0) {
     // 生命耗尽：纯 JS 重置当前关卡（不 reload，避免 BGM/最高分被清）
